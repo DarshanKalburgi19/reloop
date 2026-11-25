@@ -34,7 +34,7 @@ any business features are implemented.
 | Service | Port | Package | Database | Owner | Planned main endpoints (blueprint contract) |
 |---|---|---|---|---|---|
 | Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register/customer`, `POST /api/auth/register/repairer`, `POST /api/auth/login`, `GET /api/auth/me` (see [AUTH.md](AUTH.md)), `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}`, `GET /api/products/{id}/passport`, `POST /api/products/{id}/purchase`, `GET /api/products/mine` (see [MARKETPLACE.md](MARKETPLACE.md)) |
-| Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/internal/repair-quotes`, `POST /api/internal/repair-quotes/{id}/approve\|reject` (internal, called by repair-service), `POST /api/payments/simulate`, `GET /api/payments/{transactionId}` (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)); planned: `POST /api/orders` |
+| Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/internal/repair-quotes`, `POST /api/internal/repair-quotes/{id}/approve\|reject` (internal, called by repair-service), `POST /api/payments/simulate`, `GET /api/payments/{transactionId}`, `POST /api/orders`, `GET /api/orders[/{id}]`, `POST /api/orders/{id}/cancel`, `GET /api/transactions/{id}[/receipt\|/ledger]`, `POST /api/transactions/{id}/refunds`, `GET /api/customers/{id}/payments`, `GET /api/providers/{id}/earnings\|payouts`, `GET /api/fee-rates`, `PUT/DELETE /api/internal/fee-rates/{type}`, `POST /api/internal/transactions/{id}/refunds` (see [PAYMENTS.md](PAYMENTS.md)) |
 | Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `POST/GET /api/repairers`, `GET/PUT /api/repairers/{id}`, `GET /api/repairers/nearby`, `GET /api/repairers/me` (see [REPAIRERS.md](REPAIRERS.md)), `POST /api/repair-requests`, `GET /api/repair-requests/mine\|incoming\|{id}\|{id}/history`, `POST /api/repair-requests/{id}/accept\|reject\|inspect\|quote\|quote/revise\|quote/approve\|quote/reject\|progress\|complete\|cancel`, `PATCH /api/repair-requests/{id}/status`, `POST /api/internal/repair-requests/{id}/payment-confirmation` (internal) (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)), `GET/POST /api/inventory/parts`, `GET/PATCH /api/inventory/parts/{id}`, `POST /api/inventory/parts/{id}/stock-in\|use\|adjust\|discontinue\|reactivate`, `GET /api/inventory/parts/{id}/movements`, `GET /api/inventory/movements\|low-stock\|summary`, `GET /api/inventory/repair-requests/{id}/parts` (REPAIRER, own stock only; see [INVENTORY.md](INVENTORY.md)) |
 
 Shared (all three, Phase 1): `GET /api/health` and `GET /actuator/health`.
@@ -68,6 +68,11 @@ commission research · cloud documentation, presentation, demo video.
    (`/api/internal/repair-requests/{id}/payment-confirmation`). Both directions use
    `X-Internal-Api-Key`. order-service owns the quote amounts and payments; repair-service owns the request
    and its history and keeps only a snapshot of the current quote (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)).
+   **Marketplace orders:** order-service → product-service `POST /api/internal/products/{id}/reserve`,
+   `confirm-sale` and `release` (`X-Internal-Api-Key`). product-service owns the listing, its status and the
+   passport. order-service owns the order, fees, payments, commission, payouts, refunds and ledger. The
+   confirmation call is the last step of order-service's payment transaction, and a failure rolls the payment back
+   (see [PAYMENTS.md](PAYMENTS.md)).
 2. **Later phases:** synchronous **REST over HTTP** between services using only the
    agreed endpoint contracts above. The frontend calls the same REST APIs.
 3. **Database-per-service:** each service owns its schema. Services never read
@@ -118,9 +123,9 @@ Every service exposes:
 
 ## 8. Build sequence (from the master instruction)
 
-1. **Foundation** ← you are here (three services, health endpoints, CI)
-2. Accounts & marketplace
-3. Repairer system
-4. Orders & simulated payments
-5. Frontend integration
+1. **Foundation** (three services, health endpoints, CI) ✔
+2. Accounts & marketplace ✔
+3. Repairer system ✔
+4. Orders & simulated payments ✔ ([PAYMENTS.md](PAYMENTS.md))
+5. Frontend integration ← next
 6. Testing & deployment (30+ test cases, Docker, cloud)

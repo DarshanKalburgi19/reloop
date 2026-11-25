@@ -38,13 +38,15 @@ Java `pricePaise` → column `price_paise`.
 
 | Table | Key constraints | Indexes |
 |---|---|---|
-| `purchase_orders` | **UNIQUE** `order_number`; all money NOT NULL | `ix_orders_buyer`, `ix_orders_seller`, `ix_orders_status` |
+| `purchase_orders` | **UNIQUE** `order_number`; all money NOT NULL; both fee rates, the seller net and ReLoop revenue frozen at creation; `expires_at` payment window | `ix_orders_buyer`, `ix_orders_seller`, `ix_orders_status`, `ix_orders_product`, `ix_orders_expires` |
 | `order_items` | FK → `purchase_orders`; `product_external_id` is a plain Long (**no FK**) | `ix_order_items_order`, `ix_order_items_product_external` |
 | `repair_quotes` | **UNIQUE** `(repair_request_id, quote_revision)`; both fee rates + amounts NOT NULL; status `SENT → APPROVED/REJECTED`, older revisions `SUPERSEDED`; `valid_until` (`reloop.quotes.valid-days`) | `ix_quotes_request`, `ix_quotes_status`, `ix_quotes_repairer` |
-| `payment_transactions` | **UNIQUE** `transaction_id` ⭐; **CHECK** `ck_payments_exactly_one_ref` (exactly one of order/quote); **no PAN/CVV/UPI-PIN columns exist** | `ix_payments_status`, `ix_payments_order`, `ix_payments_quote`, `ix_payments_buyer`, `ix_payments_created` |
-| `commission_records` | **UNIQUE** `payment_transaction_id`, **UNIQUE** `transaction_id`; frozen rates | `ix_commission_status` |
-| `provider_payouts` | **UNIQUE** `payout_reference`, **UNIQUE** `payment_transaction_id`; `net = gross - commission` | `ix_payouts_provider`, `ix_payouts_status` |
-| `refund_records` | **UNIQUE** `refund_reference`; reversed commission tracked | `ix_refunds_payment`, `ix_refunds_status` |
+| `payment_transactions` | **UNIQUE** `transaction_id` ⭐; **UNIQUE** `settlement_key` (set only on SUCCESS: `ORDER-{id}` / `QUOTE-{id}`, so an order or quote can be paid once); **UNIQUE** `(buyer_account_id, idempotency_key)`; **CHECK** `ck_payments_exactly_one_ref` (exactly one of order/quote); `transaction_type`, `provider_account_id`, `platform_revenue_paise`, `refunded_amount_paise`. Provider commission is stored in the `repairer_commission_*` columns (names kept). **No PAN/CVV/UPI-PIN/bank columns exist** | `ix_payments_status`, `ix_payments_order`, `ix_payments_quote`, `ix_payments_buyer`, `ix_payments_provider_account`, `ix_payments_type`, `ix_payments_created` |
+| `commission_records` | **UNIQUE** `payment_transaction_id`, **UNIQUE** `transaction_id` (`COM-…`); frozen rates; customer fee and provider commission kept separately, plus reversed amounts | `ix_commission_status`, `ix_commission_type` |
+| `provider_payouts` | **UNIQUE** `payout_reference`, **UNIQUE** `payment_transaction_id`; `net = gross - commission`; refunded gross, reversed commission and reversed net tracked | `ix_payouts_provider`, `ix_payouts_provider_account`, `ix_payouts_status` |
+| `refund_records` | **UNIQUE** `refund_reference`; **CHECK** `ck_refunds_amounts`; base, fee, commission and provider-net shares of each refund | `ix_refunds_payment`, `ix_refunds_status` |
+| `ledger_entries` | **CHECK** `ck_ledger_positive` (amount > 0); append-only double entry: debits = credits per payment; reversal lines reference the line they reverse | `ix_ledger_payment`, `ix_ledger_account_party`, `ix_ledger_refund` |
+| `fee_rate_configs` | **UNIQUE** `transaction_type`; **CHECK** `ck_fee_rates_range` (0–0.5). Optional override of the application.properties rates | — |
 
 ### repair-service (`reloop_repair`)
 
@@ -65,9 +67,10 @@ Java `pricePaise` → column `price_paise`.
 ## Money & rate conventions
 
 - **Amounts**: `*_paise BIGINT` — ₹1 = 100 paise. Never `double`/`float`.
-- **Rates**: `DECIMAL(8,6)` — `0.0200` = 2%. Copied onto every quote,
+- **Rates**: `DECIMAL(8,6)` — `0.0200` = 2%. Copied onto every order, quote,
   transaction and commission row at creation time, **never re-read from
-  config later**.
+  config later**. Source: `fee_rate_configs` if a row exists for the transaction
+  type, otherwise `reloop.fees.*` in application.properties.
 - **Example** (blueprint): repair ₹1,000 → `base=100000`, customer fee 2% =
   `2000`, customer pays `102000`; repairer commission 2% = `2000`, repairer
   net `98000`; ReLoop total `4000` paise (₹40).

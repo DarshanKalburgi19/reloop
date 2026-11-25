@@ -107,8 +107,17 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   Quantities can never go negative (row locks, CHECK constraint), and only the owner can change them.
   Low-stock alerts. Inventory value (quantity × cost) is reported separately from repair earnings
   ([INVENTORY](docs/INVENTORY.md)).
+- **Orders, commission and simulated payments (complete):** marketplace orders reserve the listing in
+  product-service. Payments for orders (`MARKETPLACE_PURCHASE`) and approved repair quotes (`REPAIR_BOOKING`)
+  are simulated with UPI, CARD, NET_BANKING or WALLET, and the caller chooses SUCCESS, FAILED or CANCELLED. Fees
+  are configurable (2% customer fee plus 2% provider commission, frozen per order, quote and payment):
+  ₹1,000 → customer pays ₹1,020, provider nets ₹980, ReLoop keeps ₹40. Every successful payment has a unique
+  `TXN-…` id and separate commission, payout and balanced ledger records. The wrong amount is refused (422) and
+  duplicate payments are blocked. Refunds are proportional and reverse the ledger. Receipts can be printed or
+  downloaded. Customer, seller and repairer dashboards read the same records. No real money, gateway, or card or
+  bank data ([PAYMENTS](docs/PAYMENTS.md)).
 
-Next: marketplace orders & payments → reviews & delivery tracking → frontend integration → testing & deployment.
+Next: reviews & delivery tracking → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -120,9 +129,10 @@ Next: marketplace orders & payments → reviews & delivery tracking → frontend
 - [docs/REPAIRERS.md](docs/REPAIRERS.md) — repairer workshop profiles, search, nearby/map API, authorization, demo workshops
 - [docs/REPAIR_WORKFLOW.md](docs/REPAIR_WORKFLOW.md) — repair booking statuses and rules, quote/payment contracts between services, curl walkthrough, tests
 - [docs/INVENTORY.md](docs/INVENTORY.md) — repairer spare-parts inventory: model, stock rules, low-stock alerts, valuation, API, curl walkthrough, tests
+- [docs/PAYMENTS.md](docs/PAYMENTS.md) — orders, fees and commission, simulated payments, refunds and ledger, receipts, dashboards, API, curl walkthrough, tests
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
-## Business rules (implemented in later phases)
+## Business rules (implemented; see docs/PAYMENTS.md)
 
 - Customer platform fee 2%, seller/repairer commission 2% — both **configurable**, never hard-coded.
 - All monetary math uses `BigDecimal` / integer paise; payments are simulations only.
