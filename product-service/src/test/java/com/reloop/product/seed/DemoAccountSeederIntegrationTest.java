@@ -1,6 +1,8 @@
 package com.reloop.product.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,10 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.reloop.product.client.CreateRepairerProfileCommand;
 import com.reloop.product.client.RepairerProfileClient;
 import com.reloop.product.client.RepairerProfileView;
+import com.jayway.jsonpath.JsonPath;
 import com.reloop.product.entity.Account;
+import com.reloop.product.entity.Product;
 import com.reloop.product.enums.AccountRole;
 import com.reloop.product.repository.AccountRepository;
+import com.reloop.product.repository.ProductRepository;
 import com.reloop.product.repository.RepairerAccountIdentityRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
@@ -73,6 +79,12 @@ class DemoAccountSeederIntegrationTest {
     @Autowired
     private DemoAccountSeeder seeder;
 
+    @Autowired
+    private DemoProductSeeder productSeeder;
+
+    @Autowired
+    private ProductRepository products;
+
     @Test
     void demoAccountsExistWithTheRightRoles() {
         Account customer = accounts.findByEmail(DemoAccounts.CUSTOMER_EMAIL).orElseThrow();
@@ -101,7 +113,50 @@ class DemoAccountSeederIntegrationTest {
     @Test
     void seedingTwiceIsHarmless() throws Exception {
         long before = accounts.count();
+        long listings = products.count();
         seeder.run(null);
+        productSeeder.run(null);
         assertThat(accounts.count()).isEqualTo(before);
+        assertThat(products.count()).isEqualTo(listings).isEqualTo(DemoProductSeeder.LISTINGS.size());
+    }
+
+    @Test
+    void demoProductsAreSeededInAllFiveCities() throws Exception {
+        for (String city : List.of("Ahmedabad", "Surat", "Vadodara", "Rajkot", "Gandhinagar")) {
+            mvc.perform(get("/api/products").param("city", city))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(2)));
+        }
+        // 15 listings, one of them sold during seeding
+        mvc.perform(get("/api/products").param("size", "50"))
+                .andExpect(jsonPath("$.totalElements").value(DemoProductSeeder.LISTINGS.size() - 1));
+    }
+
+    @Test
+    void soldDemoProductHasARealPassportHistory() throws Exception {
+        Product sold = products.findAll().stream()
+                .filter(p -> DemoProductSeeder.SOLD_DEMO_TITLE.equals(p.getTitle()))
+                .findFirst().orElseThrow();
+        String json = mvc.perform(get("/api/products/" + sold.getId() + "/passport"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownershipTransfers").value(1))
+                .andReturn().getResponse().getContentAsString();
+        List<String> events = JsonPath.read(json, "$.history[*].eventType");
+        assertThat(events).containsExactly("LISTED", "PRICE_CHANGED", "SOLD");
+
+        // a sold item can't be bought again, even by a third demo customer
+        String sellerLogin = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + DemoAccounts.NISHA_EMAIL + "\",\"password\":\""
+                                + DemoAccounts.NISHA_PASSWORD + "\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String token = JsonPath.read(sellerLogin, "$.accessToken");
+        mvc.perform(post("/api/products/" + sold.getId() + "/purchase").header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void karansStoreListingsShowTheStore() throws Exception {
+        mvc.perform(get("/api/products").param("q", "Dell Latitude"))
+                .andExpect(jsonPath("$.content[0].storeName").value(DemoProductSeeder.DEMO_STORE_NAME));
     }
 }

@@ -11,6 +11,10 @@ import jakarta.validation.constraints.Size;
 /**
  * Body of the internal {@code POST /api/repairer-profiles}, called by product-service during
  * repairer registration. No verificationStatus field: new profiles are always UNVERIFIED.
+ *
+ * <p>{@code demo} (optional, default false) marks the profile as seeded demo data; product-service sets it
+ * only for its demo repairer account. The profile starts incomplete: the repairer adds description,
+ * categories, services and working hours with {@code PUT /api/repairers/{id}} to appear in search.</p>
  */
 public record CreateRepairerProfileRequest(
         @NotNull @Positive Long accountExternalId,
@@ -25,5 +29,6 @@ public record CreateRepairerProfileRequest(
         @NotBlank @Size(max = 300) String serviceHours,
         boolean acceptsInPerson,
         boolean acceptsPickupDrop,
-        boolean acceptsShipping) {
+        boolean acceptsShipping,
+        Boolean demo) {
 }

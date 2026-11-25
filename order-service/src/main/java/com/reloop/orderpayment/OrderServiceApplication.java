@@ -2,6 +2,7 @@ package com.reloop.orderpayment;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 
 /**
  * Entry point of the Order & Payment Service (port 8082).
@@ -12,8 +13,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *       package for components (controllers, services, repositories).</li>
  *   <li>{@code main} starts the embedded web server.</li>
  * </ul>
+ *
+ * <p>{@link UserDetailsServiceAutoConfiguration} is excluded: callers authenticate with JWTs issued by
+ * product-service (see {@code SecurityConfig}), so no generated in-memory user/password is wanted.</p>
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 public class OrderServiceApplication {
 
     public static void main(String[] args) {

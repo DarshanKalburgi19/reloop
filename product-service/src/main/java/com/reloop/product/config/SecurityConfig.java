@@ -26,7 +26,11 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  * <ul>
  *   <li><b>Stateless:</b> no HTTP session, no cookies; every request carries a Bearer JWT.
  *       Because no cookie is used for auth, CSRF protection is not applicable and is disabled.</li>
- *   <li><b>Public:</b> registration, login, health, actuator health/info, H2 console (local dev).</li>
+ *   <li><b>Public:</b> registration, login, health, actuator health/info, H2 console (local dev),
+ *       marketplace reads ({@code GET /api/products}, {@code /{id}}, {@code /{id}/passport})
+ *       and the bundled demo images under {@code /demo-images/**}.</li>
+ *   <li><b>Marketplace writes:</b> create/edit/delete/purchase and {@code /api/products/mine}
+ *       require ROLE_CUSTOMER (repairers get 403).</li>
  *   <li><b>Role-gated (URL level):</b> {@code /api/customer/**} needs ROLE_CUSTOMER,
  *       {@code /api/repairer/**} needs ROLE_REPAIRER. Controllers repeat this with
  *       {@code @PreAuthorize} (defence in depth via {@link EnableMethodSecurity}).</li>
@@ -76,6 +80,14 @@ public class SecurityConfig {
                     path.matcher("/actuator/info"),
                     path.matcher("/h2-console/**"),
                     path.matcher("/error")).permitAll()
+                // Marketplace: browsing is public, everything that changes data needs a CUSTOMER.
+                .requestMatchers(path.matcher(HttpMethod.GET, "/demo-images/**")).permitAll()
+                .requestMatchers(path.matcher(HttpMethod.GET, "/api/products/mine")).hasRole("CUSTOMER")
+                .requestMatchers(
+                    path.matcher(HttpMethod.GET, "/api/products"),
+                    path.matcher(HttpMethod.GET, "/api/products/*"),
+                    path.matcher(HttpMethod.GET, "/api/products/*/passport")).permitAll()
+                .requestMatchers(path.matcher("/api/products/**")).hasRole("CUSTOMER")
                 .requestMatchers(path.matcher("/api/customer/**")).hasRole("CUSTOMER")
                 .requestMatchers(path.matcher("/api/repairer/**")).hasRole("REPAIRER")
                 .anyRequest().authenticated())

@@ -7,10 +7,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.reloop.orderpayment.config.SecurityConfig;
+import com.reloop.orderpayment.security.JwtVerifier;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -20,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * delegates correctly without starting the database.
  */
 @WebMvcTest(HealthController.class)
+@Import({SecurityConfig.class, JwtVerifier.class})
 class HealthControllerSliceTest {
 
     @Autowired

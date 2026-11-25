@@ -1,6 +1,7 @@
 package com.reloop.product.entity;
 
 import com.reloop.product.enums.ProductCategory;
+import com.reloop.product.enums.ProductCondition;
 import com.reloop.product.enums.ProductStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -13,6 +14,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,7 +32,11 @@ import java.util.List;
     @Index(name = "ix_products_seller_status", columnList = "seller_account_id, status"),
     @Index(name = "ix_products_title", columnList = "title"),
     @Index(name = "ix_products_category", columnList = "category"),
-    @Index(name = "ix_products_store", columnList = "store_id")
+    @Index(name = "ix_products_store", columnList = "store_id"),
+    @Index(name = "ix_products_status_created", columnList = "status, created_at"),
+    @Index(name = "ix_products_city", columnList = "location_city"),
+    @Index(name = "ix_products_price", columnList = "price_paise"),
+    @Index(name = "ix_products_passport", columnList = "passport_id")
 })
 public class Product extends BaseEntity {
 
@@ -66,7 +72,26 @@ public class Product extends BaseEntity {
     @Column(name = "sold_at")
     private LocalDateTime soldAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_condition", nullable = false, length = 20)
+    private ProductCondition condition;
+
+    /** Free-text pickup point when the item is not sold from a store (e.g. "Navrangpura, near Swastik Cross Roads"). */
+    @Column(name = "pickup_location", length = 255)
+    private String pickupLocation;
+
+    /** The physical item's passport (shared by every listing of the same item). */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "passport_id", nullable = false, foreignKey = @ForeignKey(name = "fk_products_passport"))
+    private ProductPassport passport;
+
+    /** Set when the listing is sold. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "buyer_account_id", foreignKey = @ForeignKey(name = "fk_products_buyer"))
+    private Account buyer;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<ProductImage> images = new ArrayList<>();
 
     public Product() {
@@ -150,5 +175,46 @@ public class Product extends BaseEntity {
 
     public void setImages(List<ProductImage> images) {
         this.images = images;
+    }
+
+    public ProductCondition getCondition() {
+        return condition;
+    }
+
+    public void setCondition(ProductCondition condition) {
+        this.condition = condition;
+    }
+
+    public String getPickupLocation() {
+        return pickupLocation;
+    }
+
+    public void setPickupLocation(String pickupLocation) {
+        this.pickupLocation = pickupLocation;
+    }
+
+    public ProductPassport getPassport() {
+        return passport;
+    }
+
+    public void setPassport(ProductPassport passport) {
+        this.passport = passport;
+    }
+
+    public Account getBuyer() {
+        return buyer;
+    }
+
+    public void setBuyer(Account buyer) {
+        this.buyer = buyer;
+    }
+
+    /** Replaces all images; keeps the bidirectional link consistent (orphanRemoval deletes old rows). */
+    public void replaceImages(List<ProductImage> newImages) {
+        images.clear();
+        for (ProductImage image : newImages) {
+            image.setProduct(this);
+            images.add(image);
+        }
     }
 }

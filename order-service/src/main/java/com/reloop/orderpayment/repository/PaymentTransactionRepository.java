@@ -17,4 +17,9 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     List<PaymentTransaction> findByBuyerAccountId(Long buyerAccountId);
     List<PaymentTransaction> findByStatus(PaymentStatus status);
 
+    /** The successful payment of a repair quote, if any (a quote is paid at most once). */
+    Optional<PaymentTransaction> findFirstByRepairQuoteIdAndStatus(Long repairQuoteId, PaymentStatus status);
+
+    List<PaymentTransaction> findByRepairQuoteIdOrderByIdAsc(Long repairQuoteId);
+
 }

@@ -59,9 +59,9 @@ class RepairSchemaTest {
         SparePart part = new SparePart();
         part.setRepairerProfile(profile);
         part.setSku(sku);
-        part.setName("Part " + sku);
+        part.setPartName("Part " + sku);
         part.setUnitCostPaise(450000L);
-        part.setStockQuantity(stock);
+        part.setQuantity(stock);
         return part;
     }
 
@@ -124,15 +124,33 @@ class RepairSchemaTest {
         SparePart part = parts.saveAndFlush(newPart(profile, "CBL-USB-C", 10));
 
         InventoryMovement movement = new InventoryMovement();
+        movement.setRepairerProfile(profile);
         movement.setSparePart(part);
-        movement.setMovementType(InventoryMovementType.RECEIVED);
+        movement.setMovementType(InventoryMovementType.STOCK_IN);
         movement.setQuantityChange(+4);
         movement.setStockAfter(14);
         movements.saveAndFlush(movement);
 
         assertEquals(1, movements.findBySparePart_IdOrderByCreatedAt(part.getId()).size());
-        assertEquals(InventoryMovementType.RECEIVED,
-                movements.findBySparePart_IdOrderByCreatedAt(part.getId()).get(0).getMovementType());
+        InventoryMovement saved = movements.findBySparePart_IdOrderByCreatedAt(part.getId()).get(0);
+        assertEquals(InventoryMovementType.STOCK_IN, saved.getMovementType());
+        assertNotNull(saved.getMovementDate(), "movementDate defaults to the creation time");
+        assertEquals(4, saved.getQuantity());
         assertTrue(movements.findByRepairRequest_Id(999L).isEmpty());
+    }
+
+    @Test
+    void zeroQuantityMovementIsRejectedByCheckConstraint() {
+        RepairerProfile profile = profiles.saveAndFlush(newProfile(9006L, "ZeroFix"));
+        SparePart part = parts.saveAndFlush(newPart(profile, "CBL-ZERO", 3));
+
+        InventoryMovement movement = new InventoryMovement();
+        movement.setRepairerProfile(profile);
+        movement.setSparePart(part);
+        movement.setMovementType(InventoryMovementType.ADJUSTMENT);
+        movement.setQuantityChange(0);
+        movement.setStockAfter(3);
+
+        assertThrows(DataIntegrityViolationException.class, () -> movements.saveAndFlush(movement));
     }
 }

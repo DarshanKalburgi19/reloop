@@ -6,18 +6,22 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -31,11 +35,44 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Request validation failed", req, fieldErrors(ex));
+    }
+
+    /** Query-parameter binding (e.g. GET /api/products?category=NOPE) - same JSON shape. */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiError> binding(BindException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Request validation failed", req, fieldErrors(ex));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> typeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Invalid value for parameter '" + ex.getName() + "'", req,
+                Map.of(ex.getName(), "invalid value"));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiError> methodValidation(HandlerMethodValidationException ex, HttpServletRequest req) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        ex.getParameterValidationResults().forEach(result -> {
+            String name = result.getMethodParameter().getParameterName();
+            String message = result.getResolvableErrors().isEmpty() ? "invalid value"
+                    : result.getResolvableErrors().get(0).getDefaultMessage();
+            fields.putIfAbsent(name == null ? "parameter" : name, message);
+        });
+        return build(HttpStatus.BAD_REQUEST, "Request validation failed", req, fields);
+    }
+
+    private static Map<String, String> fieldErrors(BindException ex) {
         Map<String, String> fields = new LinkedHashMap<>();
         for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
-            fields.putIfAbsent(fe.getField(), fe.getDefaultMessage());
+            String message = fe.isBindingFailure()
+                    ? "invalid value '" + fe.getRejectedValue() + "'"
+                    : fe.getDefaultMessage();
+            fields.putIfAbsent(fe.getField(), message);
         }
-        return build(HttpStatus.BAD_REQUEST, "Request validation failed", req, fields);
+        ex.getBindingResult().getGlobalErrors()
+                .forEach(ge -> fields.putIfAbsent(ge.getObjectName(), ge.getDefaultMessage()));
+        return fields;
     }
 
     @ExceptionHandler(FieldValidationException.class)
@@ -62,6 +99,27 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiError> notFound(NoResourceFoundException ex, HttpServletRequest req) {
         return build(HttpStatus.NOT_FOUND, "No endpoint " + req.getMethod() + " " + req.getRequestURI(), req, Map.of());
+    }
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ApiError> productNotFound(ProductNotFoundException ex, HttpServletRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, Map.of());
+    }
+
+    @ExceptionHandler({ListingOwnershipException.class, OwnProductPurchaseException.class})
+    public ResponseEntity<ApiError> forbiddenBusinessRule(RuntimeException ex, HttpServletRequest req) {
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), req, Map.of());
+    }
+
+    @ExceptionHandler({ProductNotAvailableException.class, ListingStateException.class})
+    public ResponseEntity<ApiError> listingConflict(RuntimeException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), req, Map.of());
+    }
+
+    /** Another purchase holds the row lock too long (H2 lock timeout 50200) or another concurrency conflict. */
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<ApiError> lockConflict(ConcurrencyFailureException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "This product is being purchased by someone else; please try again", req, Map.of());
     }
 
     @ExceptionHandler(EmailAlreadyRegisteredException.class)

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" role="img" aria-label="ReLoop placeholder image: Appliances">
+  <title>ReLoop placeholder - Appliances</title>
+  <rect width="640" height="480" fill="#ccfbf1"/>
+  <rect x="16" y="16" width="608" height="448" rx="24" fill="none" stroke="#0f766e" stroke-width="4" stroke-dasharray="14 10" opacity="0.5"/>
+  <path d="M265 140h110a10 10 0 0 1 10 10v130a10 10 0 0 1-10 10H265a10 10 0 0 1-10-10V150a10 10 0 0 1 10-10zm55 50a35 35 0 1 0 0.1 0zm-45-36h20v12h-20z" fill="#0f766e" fill-rule="evenodd" stroke="#0f766e" stroke-width="2" opacity="0.85"/>
+  <text x="320" y="352" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#0f766e">Appliances</text>
+  <text x="320" y="392" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#0f766e" opacity="0.8">ReLoop demo image - no photo uploaded</text>
+</svg>

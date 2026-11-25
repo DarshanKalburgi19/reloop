@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Phone - cracked screen (demo placeholder)">
+  <rect width="400" height="300" fill="#1f6feb"/>
+  <rect x="150" y="60" width="100" height="180" rx="14" fill="#fff" opacity="0.9"/><path d="M165 90 L200 140 L180 170 L235 220 M200 140 L230 110" stroke="#1f2937" stroke-width="4" fill="none"/>
+  <text x="200" y="270" font-family="sans-serif" font-size="18" fill="#fff" text-anchor="middle">Phone - cracked screen</text>
+  <text x="200" y="292" font-family="sans-serif" font-size="11" fill="#fff" opacity="0.8" text-anchor="middle">ReLoop demo placeholder - not a real photo</text>
+</svg>

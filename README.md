@@ -85,11 +85,30 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
 
 ## Project status
 
-**Phase 1 — Foundation (complete):** three runnable services, H2 databases, actuator
-health checks, 18 passing tests (6 per service).
+- **Foundation (complete):** three runnable services, H2 databases, actuator health checks.
+- **Data model (complete):** entities, constraints and indexes for all three services ([ER_DIAGRAM](docs/ER_DIAGRAM.md), [SCHEMA](docs/SCHEMA.md)).
+- **Accounts & auth (complete):** customer and repairer registration, login, JWT, role-based access, demo accounts ([AUTH](docs/AUTH.md)).
+- **Second-hand marketplace (complete):** list, edit, deactivate, browse, keyword search, filters,
+  product details, purchase rules, and a product passport with full history. Demo listings in
+  Ahmedabad, Surat, Vadodara, Rajkot and Gandhinagar ([MARKETPLACE](docs/MARKETPLACE.md)).
+- **Repairer service providers (complete):** repairers create and edit workshop profiles
+  (categories, expertise, priced services, location, hours, repair methods, availability).
+  Customers search by city, category, price and method, or find workshops near a map point
+  (Leaflet-ready coordinates). JWT-secured in repair-service. Ten labelled demo workshops across
+  Gujarat ([REPAIRERS](docs/REPAIRERS.md)).
+- **Repair booking workflow (complete):** customers book a workshop (category, problem, demo photos,
+  in-person or send-item), approve or reject quotes and follow a timestamped status history; repairers
+  accept/reject, inspect, quote and revise, record progress and complete. Quotes, fees (2% + 2%, frozen
+  per quote) and simulated payments live in order-service, which separately records commission and
+  payout; the two services coordinate only over REST ([REPAIR_WORKFLOW](docs/REPAIR_WORKFLOW.md)).
+- **Spare-parts inventory (complete):** each repairer manages their own parts (name, category, quantity,
+  purchase cost, low-stock threshold). Every stock change is recorded as a movement: stock received,
+  used in a repair (linked to a paid or in-progress repair request), or adjusted with a reason.
+  Quantities can never go negative (row locks, CHECK constraint), and only the owner can change them.
+  Low-stock alerts. Inventory value (quantity × cost) is reported separately from repair earnings
+  ([INVENTORY](docs/INVENTORY.md)).
 
-Roadmap: Phase 2 accounts & marketplace → Phase 3 repairer system → Phase 4 orders &
-simulated payments → Phase 5 frontend integration → Phase 6 testing & deployment.
+Next: marketplace orders & payments → reviews & delivery tracking → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -97,6 +116,10 @@ simulated payments → Phase 5 frontend integration → Phase 6 testing & deploy
 - [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) — Mermaid ER diagrams for all three services
 - [docs/SCHEMA.md](docs/SCHEMA.md) — schema configuration, constraints, indexes, money conventions
 - [docs/AUTH.md](docs/AUTH.md) — registration, login, JWT + roles, **demo credentials**, how to test both account types
+- [docs/MARKETPLACE.md](docs/MARKETPLACE.md) — marketplace API, listing/purchase rules, product passport, demo products, curl walkthrough
+- [docs/REPAIRERS.md](docs/REPAIRERS.md) — repairer workshop profiles, search, nearby/map API, authorization, demo workshops
+- [docs/REPAIR_WORKFLOW.md](docs/REPAIR_WORKFLOW.md) — repair booking statuses and rules, quote/payment contracts between services, curl walkthrough, tests
+- [docs/INVENTORY.md](docs/INVENTORY.md) — repairer spare-parts inventory: model, stock rules, low-stock alerts, valuation, API, curl walkthrough, tests
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented in later phases)

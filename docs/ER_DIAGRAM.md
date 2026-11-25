@@ -17,6 +17,11 @@ erDiagram
     CITY ||--o{ STORE : located_in
     STORE ||--o{ PRODUCT : lists
     PRODUCT ||--o{ PRODUCT_IMAGE : has
+    ACCOUNT ||--o{ PRODUCT : buys
+    PRODUCT_PASSPORT ||--o{ PRODUCT : "one item, 1..n listings"
+    ACCOUNT ||--o{ PRODUCT_PASSPORT : "currently owns"
+    PRODUCT_PASSPORT ||--o{ PRODUCT_HISTORY_EVENT : "timeline (append-only)"
+    PRODUCT ||--o{ PRODUCT_HISTORY_EVENT : "event of"
 
     ACCOUNT {
         bigint id PK
@@ -83,9 +88,31 @@ erDiagram
         string description
         string category "enum ProductCategory - indexed"
         bigint price_paise "integer paise"
-        string status "enum DRAFT|ACTIVE|RESERVED|SOLD|ARCHIVED"
-        string location_city
+        string status "enum DRAFT|ACTIVE|RESERVED|SOLD|ARCHIVED - availability"
+        string item_condition "enum LIKE_NEW|VERY_GOOD|GOOD|FAIR|NEEDS_REPAIR"
+        string location_city "indexed"
+        string pickup_location "nullable"
+        bigint passport_id FK "NOT NULL, indexed"
+        bigint buyer_account_id FK "nullable - set when SOLD"
         timestamp sold_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    PRODUCT_PASSPORT {
+        bigint id PK
+        string passport_code UK "uk_passports_code - RLP-XXXX-XXXX-XXXX, immutable"
+        bigint current_owner_account_id FK "indexed - moves to buyer on purchase"
+        timestamp created_at
+        timestamp updated_at
+    }
+    PRODUCT_HISTORY_EVENT {
+        bigint id PK
+        bigint passport_id FK "indexed with created_at"
+        bigint product_id FK "indexed"
+        string event_type "LISTED|RELISTED|UPDATED|PRICE_CHANGED|DEACTIVATED|REACTIVATED|SOLD"
+        bigint actor_account_id FK "nullable"
+        bigint price_paise "price at the time of the event"
+        string details
         timestamp created_at
         timestamp updated_at
     }
@@ -234,13 +261,18 @@ erDiagram
 ```mermaid
 erDiagram
     REPAIRER_PROFILE ||--o{ REPAIR_SERVICE : offers
+    REPAIRER_PROFILE ||--o{ REPAIRER_PROFILE_CATEGORY : "repair categories"
+    REPAIRER_PROFILE ||--o{ REPAIRER_WORKING_HOURS : "opening hours"
+    REPAIRER_PROFILE ||--o{ REPAIRER_REVIEW : rated
     REPAIRER_PROFILE ||--o{ REPAIR_REQUEST : receives
     REPAIRER_PROFILE ||--o{ SPARE_PART : stocks
     REPAIR_SERVICE ||--o{ REPAIR_REQUEST : "optional choice"
     REPAIR_REQUEST ||--o{ REPAIR_STATUS_HISTORY : timeline
+    REPAIR_REQUEST ||--o{ REPAIR_REQUEST_IMAGE : photos
     REPAIR_REQUEST ||--o{ INVENTORY_MOVEMENT : "parts used"
     REPAIR_REQUEST ||--o{ DELIVERY_TRACKING : shipments
     SPARE_PART ||--o{ INVENTORY_MOVEMENT : movements
+    REPAIRER_PROFILE ||--o{ INVENTORY_MOVEMENT : owns
 
     REPAIRER_PROFILE {
         bigint id PK
@@ -260,6 +292,34 @@ erDiagram
         boolean accepts_shipping "delivery mode"
         string verification_status "enum UNVERIFIED|VERIFIED|REJECTED"
         string status "enum ACTIVE|INACTIVE|SUSPENDED - indexed"
+        string availability "enum AVAILABLE|BUSY|UNAVAILABLE"
+        string availability_note
+        bigint starting_price_paise "min active service price - sort"
+        double rating_average "summary of reviews"
+        int rating_count
+        boolean profile_complete "listed in search when ACTIVE and complete"
+        boolean is_demo "seeded demo data"
+        timestamp created_at
+        timestamp updated_at
+    }
+    REPAIRER_PROFILE_CATEGORY {
+        bigint repairer_profile_id FK
+        string category "enum RepairServiceCategory - indexed"
+    }
+    REPAIRER_WORKING_HOURS {
+        bigint repairer_profile_id FK
+        string day_of_week "MONDAY..SUNDAY"
+        time opens_at
+        time closes_at
+    }
+    REPAIRER_REVIEW {
+        bigint id PK
+        bigint repairer_profile_id FK "indexed with created_at"
+        int rating "CHECK 1-5"
+        string comment
+        string reviewer_name
+        bigint customer_account_external_id "ext - nullable"
+        boolean is_demo
         timestamp created_at
         timestamp updated_at
     }
@@ -270,6 +330,7 @@ erDiagram
         string description
         string category "enum RepairServiceCategory - indexed"
         bigint estimated_price_paise "nullable"
+        string price_type "enum FIXED|STARTING_FROM"
         int estimated_days
         string status "enum ACTIVE|INACTIVE"
         timestamp created_at
@@ -285,17 +346,38 @@ erDiagram
         string delivery_mode "enum IN_PERSON|PICKUP_DROP|SHIPPING"
         string item_category "enum RepairServiceCategory"
         string item_description
+        string problem_description
         string customer_notes
-        string status "REQUESTED..COMPLETED - indexed"
+        string inspection_notes
+        string close_reason "reject or cancel reason"
+        string status "12 RepairStatus values - indexed"
         bigint latest_quote_id "ext order-service - no FK"
+        int quote_revision "snapshot of current quote"
+        bigint quote_base_amount_paise "snapshot"
+        bigint quote_customer_fee_paise "snapshot"
+        bigint quote_total_payable_paise "snapshot"
+        bigint quote_repairer_commission_paise "snapshot"
+        bigint quote_repairer_net_paise "snapshot"
+        string quote_summary "snapshot"
+        int quote_estimated_days "snapshot"
+        timestamp quote_sent_at "snapshot"
         bigint payment_transaction_id "ext order-service - no FK"
+        bigint version "optimistic lock"
         timestamp accepted_at
+        timestamp inspected_at
+        timestamp quoted_at
         timestamp approved_at
         timestamp paid_at
         timestamp in_progress_at
         timestamp completed_at
+        timestamp closed_at
         timestamp created_at
         timestamp updated_at
+    }
+    REPAIR_REQUEST_IMAGE {
+        bigint repair_request_id FK
+        string image_url "demo-images path or https"
+        int position "display order"
     }
     REPAIR_STATUS_HISTORY {
         bigint id PK
@@ -310,26 +392,29 @@ erDiagram
     }
     SPARE_PART {
         bigint id PK
-        bigint repairer_profile_id FK "UK with sku"
-        string sku "unique per repairer"
-        string name "indexed"
+        bigint repairer_profile_id FK "API repairerId; UK with sku"
+        string sku "unique per repairer, generated if omitted"
+        string name "API partName, indexed"
+        string category "enum SparePartCategory"
         string description
-        bigint unit_cost_paise "integer paise"
-        int stock_quantity "CHECK >= 0"
-        int reorder_level
+        bigint unit_cost_paise "API unitCost, integer paise, CHECK >= 0"
+        int stock_quantity "API quantity, CHECK >= 0"
+        int reorder_level "API lowStockThreshold, CHECK >= 0"
         string status "enum ACTIVE|DISCONTINUED"
         timestamp created_at
         timestamp updated_at
     }
     INVENTORY_MOVEMENT {
         bigint id PK
+        bigint repairer_profile_id FK "API repairerId, indexed with movement_date"
         bigint spare_part_id FK "indexed with created_at"
-        bigint repair_request_id FK "nullable, indexed"
-        string movement_type "RECEIVED|CONSUMED|ADJUSTMENT|RETURNED"
-        int quantity_change "signed"
-        int stock_after "audit snapshot"
-        bigint unit_cost_paise
+        bigint repair_request_id FK "nullable, required for USED_IN_REPAIR"
+        string movement_type "STOCK_IN|USED_IN_REPAIR|ADJUSTMENT"
+        int quantity_change "signed, CHECK <> 0"
+        int stock_after "audit snapshot, CHECK >= 0"
+        bigint unit_cost_paise "cost at movement time"
         string note
+        timestamp movement_date "API movementDate"
         timestamp created_at
         timestamp updated_at
     }
@@ -375,7 +460,9 @@ flowchart LR
     RQ -- "repair_request_id (ext)" --> RR
     RR -- "customer_account_id" --> ACC
     RR -- "delivery_address_id (ext)" --> ADDR
-    RR -- "latest_quote_id / payment_transaction_id (ext)" --> PT
+    RR -- "latest_quote_id (ext)" --> RQ
+    RR -- "payment_transaction_id (ext)" --> PT
+    PT -- "repair_quote_id" --> RQ
     RP -- "account_external_id" --> ACC
     RAI -- "repairer_profile_id (ext)" --> RP
     OS -. "OrderItem.product_external_id" .-> PRD

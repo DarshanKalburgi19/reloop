@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" role="img" aria-label="ReLoop placeholder image: Home &amp; Kitchen">
+  <title>ReLoop placeholder - Home &amp; Kitchen</title>
+  <rect width="640" height="480" fill="#fef3c7"/>
+  <rect x="16" y="16" width="608" height="448" rx="24" fill="none" stroke="#b45309" stroke-width="4" stroke-dasharray="14 10" opacity="0.5"/>
+  <path d="M250 190h140v70a20 20 0 0 1-20 20H270a20 20 0 0 1-20-20zm-15 0h170v-14H235zm60-30h50v16h-50z" fill="#b45309" fill-rule="evenodd" stroke="#b45309" stroke-width="2" opacity="0.85"/>
+  <text x="320" y="352" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#b45309">Home &amp; Kitchen</text>
+  <text x="320" y="392" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#b45309" opacity="0.8">ReLoop demo image - no photo uploaded</text>
+</svg>

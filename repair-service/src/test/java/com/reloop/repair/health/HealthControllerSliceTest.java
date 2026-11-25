@@ -7,19 +7,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.reloop.repair.config.SecurityConfig;
+import com.reloop.repair.security.JwtVerifier;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Slice test: loads only the web layer (controllers) and replaces
  * {@link HealthService} with a Mockito mock. This proves the controller
- * delegates correctly without starting the database.
+ * delegates correctly without starting the database. The real security rules are imported
+ * (a plain {@code @Configuration} is not part of the slice), so this also proves the endpoint is public.
  */
 @WebMvcTest(HealthController.class)
+@Import({SecurityConfig.class, JwtVerifier.class})
 class HealthControllerSliceTest {
 
     @Autowired
