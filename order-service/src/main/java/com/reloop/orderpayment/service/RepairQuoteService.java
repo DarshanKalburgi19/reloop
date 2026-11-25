@@ -4,8 +4,8 @@ import com.reloop.orderpayment.dto.quote.CreateRepairQuoteRequest;
 import com.reloop.orderpayment.dto.quote.QuoteDecisionRequest;
 import com.reloop.orderpayment.dto.quote.RepairQuoteView;
 import com.reloop.orderpayment.entity.RepairQuote;
-import com.reloop.orderpayment.enums.PaymentStatus;
 import com.reloop.orderpayment.enums.QuoteStatus;
+import com.reloop.orderpayment.enums.TransactionType;
 import com.reloop.orderpayment.exception.ConflictException;
 import com.reloop.orderpayment.exception.NotFoundException;
 import com.reloop.orderpayment.repository.PaymentTransactionRepository;
@@ -31,15 +31,15 @@ public class RepairQuoteService {
 
     private final RepairQuoteRepository quotes;
     private final PaymentTransactionRepository payments;
-    private final FeeCalculator fees;
+    private final FeeRateService feeRates;
     private final Clock clock;
     private final int validDays;
 
-    public RepairQuoteService(RepairQuoteRepository quotes, PaymentTransactionRepository payments, FeeCalculator fees,
+    public RepairQuoteService(RepairQuoteRepository quotes, PaymentTransactionRepository payments, FeeRateService feeRates,
                               Clock clock, @Value("${reloop.quotes.valid-days:7}") int validDays) {
         this.quotes = quotes;
         this.payments = payments;
-        this.fees = fees;
+        this.feeRates = feeRates;
         this.clock = clock;
         this.validDays = validDays;
     }
@@ -68,12 +68,15 @@ public class RepairQuoteService {
             revision = previous.getQuoteRevision() + 1;
         }
 
-        FeeCalculator.Breakdown b = fees.current(req.baseAmountPaise());
+        // rates in force now (database override or application.properties), frozen on the quote
+        FeeCalculator.Breakdown b = feeRates.breakdown(TransactionType.REPAIR_BOOKING, req.baseAmountPaise());
         LocalDateTime now = LocalDateTime.now(clock);
         RepairQuote q = new RepairQuote();
         q.setRepairRequestExternalId(req.repairRequestId());
         q.setRepairerProfileId(req.repairerProfileId());
         q.setCustomerAccountId(req.customerAccountId());
+        q.setRepairerAccountId(req.repairerAccountId() != null ? req.repairerAccountId()
+                : previous != null ? previous.getRepairerAccountId() : null);
         q.setQuoteRevision(revision);
         q.setStatus(QuoteStatus.SENT);
         q.setSummary(blankToNull(req.summary()));
@@ -152,7 +155,7 @@ public class RepairQuoteService {
     }
 
     private boolean isPaid(RepairQuote q) {
-        return payments.findFirstByRepairQuoteIdAndStatus(q.getId(), PaymentStatus.SUCCESS).isPresent();
+        return payments.findFirstByRepairQuoteIdAndStatusIn(q.getId(), PaymentService.SETTLED).isPresent();
     }
 
     private static String blankToNull(String s) {

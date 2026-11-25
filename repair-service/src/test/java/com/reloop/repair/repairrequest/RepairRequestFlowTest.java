@@ -164,6 +164,37 @@ class RepairRequestFlowTest {
                         .formatted(quoteId, paymentId, paymentId, amountPaise)));
     }
 
+    /* ─────────────────────── /api/repairs short routes ─────────────────────── */
+
+    @Test
+    void shortRoutesQuoteReviseAndApproveLikeTheWorkflowEndpoints() throws Exception {
+        long id = inspected();
+        var quote = post("/api/repairs/{id}/quote", id).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount))
+                .contentType(MediaType.APPLICATION_JSON);
+        mvc.perform(quote.content(quoteBody("1000.00"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("QUOTED"))
+                .andExpect(jsonPath("$.quote.revision").value(1))
+                .andExpect(jsonPath("$.quote.totalPayable").value(1020.00));
+        // the same route revises an existing unpaid quote
+        mvc.perform(post("/api/repairs/{id}/quote", id).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount))
+                        .contentType(MediaType.APPLICATION_JSON).content(quoteBody("1200.00")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.quote.revision").value(2));
+        verify(orderService).createQuote(org.mockito.ArgumentMatchers.argThat(cmd -> cmd.repairRequestId() == id
+                && cmd.baseAmountPaise() == 120_000L && Long.valueOf(repairerAccount).equals(cmd.repairerAccountId())));
+
+        // customers can't quote, repairers can't approve
+        mvc.perform(post("/api/repairs/{id}/quote", id).header(HttpHeaders.AUTHORIZATION, customer(customerAccount))
+                        .contentType(MediaType.APPLICATION_JSON).content(quoteBody("1.00")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/repairs/{id}/approve", id).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount)))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(post("/api/repairs/{id}/approve", id).header(HttpHeaders.AUTHORIZATION, customer(customerAccount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"));
+        mvc.perform(post("/api/repairs/{id}/approve", id)).andExpect(status().isUnauthorized());
+    }
+
     /* ───────────────────────────── happy path ───────────────────────────── */
 
     @Test
@@ -201,7 +232,7 @@ class RepairRequestFlowTest {
                 .andExpect(jsonPath("$.quote.totalPayable").value(1530.00))
                 .andExpect(jsonPath("$.quote.estimatedDays").value(2));
         verify(orderService).createQuote(new CreateQuoteCommand(id, JsonPath.read(created, "$.requestNumber"), profileId,
-                customerAccount, 150_000L, "Replace OLED panel and adhesive"));
+                customerAccount, 150_000L, "Replace OLED panel and adhesive", repairerAccount));
 
         long quoteId = latestQuoteId(id);
         asCustomer(id, "quote/approve", note("Go ahead")).andExpect(status().isOk())

@@ -15,5 +15,9 @@ public enum ProductHistoryEventType {
     /** The seller made a deactivated listing available again. */
     REACTIVATED,
     /** Bought by another customer: ownership of the passport moves to the buyer. */
-    SOLD
+    SOLD,
+    /** A buyer placed an order (order-service); the listing is held until it is paid, cancelled or expires. */
+    RESERVED,
+    /** The order holding the listing was cancelled or expired; the listing is ACTIVE again. */
+    RESERVATION_RELEASED
 }

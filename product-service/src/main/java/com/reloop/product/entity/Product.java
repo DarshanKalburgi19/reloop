@@ -90,11 +90,46 @@ public class Product extends BaseEntity {
     @JoinColumn(name = "buyer_account_id", foreignKey = @ForeignKey(name = "fk_products_buyer"))
     private Account buyer;
 
+    /** Buyer (Account ID) holding the listing while their order-service order awaits payment. */
+    @Column(name = "reserved_by_account_id")
+    private Long reservedByAccountId;
+
+    /** order-service order number that reserved (and, after payment, bought) this listing. */
+    @Column(name = "reservation_reference", length = 64)
+    private String reservationReference;
+
+    @Column(name = "reserved_at")
+    private LocalDateTime reservedAt;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<ProductImage> images = new ArrayList<>();
 
     public Product() {
+    }
+
+    public Long getReservedByAccountId() {
+        return reservedByAccountId;
+    }
+
+    public void setReservedByAccountId(Long reservedByAccountId) {
+        this.reservedByAccountId = reservedByAccountId;
+    }
+
+    public String getReservationReference() {
+        return reservationReference;
+    }
+
+    public void setReservationReference(String reservationReference) {
+        this.reservationReference = reservationReference;
+    }
+
+    public LocalDateTime getReservedAt() {
+        return reservedAt;
+    }
+
+    public void setReservedAt(LocalDateTime reservedAt) {
+        this.reservedAt = reservedAt;
     }
 
     public Account getSeller() {

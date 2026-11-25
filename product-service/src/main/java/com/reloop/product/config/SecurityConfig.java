@@ -34,6 +34,8 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  *   <li><b>Role-gated (URL level):</b> {@code /api/customer/**} needs ROLE_CUSTOMER,
  *       {@code /api/repairer/**} needs ROLE_REPAIRER. Controllers repeat this with
  *       {@code @PreAuthorize} (defence in depth via {@link EnableMethodSecurity}).</li>
+ *   <li><b>Internal:</b> {@code /api/internal/**} (order-service reserve / confirm-sale / release) bypasses JWT
+ *       and is guarded by the shared {@code X-Internal-Api-Key} instead.</li>
  *   <li><b>Everything else</b> (incl. {@code GET /api/auth/me}) requires any valid token.</li>
  *   <li>401/403 responses are JSON, never HTML or a login redirect.</li>
  * </ul>
@@ -80,6 +82,8 @@ public class SecurityConfig {
                     path.matcher("/actuator/info"),
                     path.matcher("/h2-console/**"),
                     path.matcher("/error")).permitAll()
+                // Service-to-service (order-service): authenticated by X-Internal-Api-Key in the controller.
+                .requestMatchers(path.matcher("/api/internal/**")).permitAll()
                 // Marketplace: browsing is public, everything that changes data needs a CUSTOMER.
                 .requestMatchers(path.matcher(HttpMethod.GET, "/demo-images/**")).permitAll()
                 .requestMatchers(path.matcher(HttpMethod.GET, "/api/products/mine")).hasRole("CUSTOMER")

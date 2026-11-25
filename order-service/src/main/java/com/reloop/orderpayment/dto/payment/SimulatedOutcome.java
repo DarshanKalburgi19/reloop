@@ -1,7 +1,8 @@
 package com.reloop.orderpayment.dto.payment;
 
-/** What the payment simulator should do. FAILURE lets demos exercise a declined payment. */
+/** What the payment simulator should do. No real gateway is ever contacted. */
 public enum SimulatedOutcome {
     SUCCESS,
-    FAILURE
+    FAILED,
+    CANCELLED
 }

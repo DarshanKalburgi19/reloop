@@ -222,6 +222,17 @@ public class RepairRequestService {
     }
 
     /**
+     * {@code POST /api/repairs/{id}/quote}: first quote when the request is INSPECTED, otherwise a revision
+     * (QUOTED, QUOTE_REJECTED, AWAITING_PAYMENT). Other states fail exactly like the quote endpoint.
+     */
+    @Transactional
+    public RepairRequestResponse quoteOrRevise(AuthenticatedAccount caller, Long id, QuoteRequest req) {
+        RepairRequest r = forRepairer(caller, id);
+        boolean revise = RepairAction.REVISE_QUOTE.allowedIn(r.getStatus());
+        return quote(caller, id, req, revise);
+    }
+
+    /**
      * Sends the first quote ({@code revise = false}, after inspection) or a revised one ({@code revise = true},
      * while unpaid). Either way the customer must approve the new quote; order-service supersedes the old one.
      */
@@ -231,7 +242,8 @@ public class RepairRequestService {
         require(revise ? RepairAction.REVISE_QUOTE : RepairAction.QUOTE, r);
         long basePaise = Money.toPaise(req.amount());
         QuoteView quote = orderService.createQuote(new CreateQuoteCommand(r.getId(), r.getRequestNumber(),
-                r.getRepairerProfile().getId(), r.getCustomerAccountId(), basePaise, req.summary().trim()));
+                r.getRepairerProfile().getId(), r.getCustomerAccountId(), basePaise, req.summary().trim(),
+                r.getRepairerProfile().getAccountExternalId()));
         if (!Objects.equals(quote.repairRequestId(), r.getId()) || quote.baseAmountPaise() != basePaise) {
             throw new OrderServiceException(502, "Order service returned a quote that doesn't match this request", null);
         }

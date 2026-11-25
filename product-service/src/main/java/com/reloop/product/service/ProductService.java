@@ -71,8 +71,8 @@ public class ProductService {
     static final Set<ProductStatus> PUBLIC_STATUSES = EnumSet.of(ProductStatus.ACTIVE, ProductStatus.RESERVED, ProductStatus.SOLD);
 
     static final String PURCHASE_NOTE =
-            "Purchase recorded and passport ownership transferred. Order, simulated payment and commission "
-                    + "records are added by order-service in the orders & payments phase.";
+            "Purchase recorded and passport ownership transferred WITHOUT an order, payment or fees (legacy demo "
+                    + "shortcut). Use order-service POST /api/orders + POST /api/payments/simulate for real orders.";
 
     private final ProductRepository products;
     private final ProductPassportRepository passports;
@@ -81,10 +81,13 @@ public class ProductService {
     private final StoreRepository stores;
     private final CityRepository cities;
     private final PassportCodeGenerator codeGenerator;
+    private final boolean directPurchaseEnabled;
 
     public ProductService(ProductRepository products, ProductPassportRepository passports,
                           ProductHistoryEventRepository history, AccountRepository accounts,
-                          StoreRepository stores, CityRepository cities, PassportCodeGenerator codeGenerator) {
+                          StoreRepository stores, CityRepository cities, PassportCodeGenerator codeGenerator,
+                          @org.springframework.beans.factory.annotation.Value(
+                                  "${reloop.marketplace.direct-purchase-enabled:false}") boolean directPurchaseEnabled) {
         this.products = products;
         this.passports = passports;
         this.history = history;
@@ -92,6 +95,7 @@ public class ProductService {
         this.stores = stores;
         this.cities = cities;
         this.codeGenerator = codeGenerator;
+        this.directPurchaseEnabled = directPurchaseEnabled;
     }
 
     /* ───────────────────────────── create ───────────────────────────── */
@@ -223,8 +227,16 @@ public class ProductService {
 
     /* ───────────────────────────── purchase ───────────────────────────── */
 
+    /**
+     * Legacy one-step purchase without an order, payment or fees (audit C-1). Disabled unless
+     * {@code reloop.marketplace.direct-purchase-enabled=true}; the normal flow is order-service
+     * ({@code POST /api/orders} + {@code POST /api/payments/simulate}).
+     */
     @Transactional
     public PurchaseResponse purchase(Long buyerId, Long productId) {
+        if (!directPurchaseEnabled) {
+            throw new com.reloop.product.exception.DirectPurchaseDisabledException();
+        }
         Account buyer = activeAccount(buyerId);
         Product product = products.findByIdForUpdate(productId).orElseThrow(() -> new ProductNotFoundException(productId));
 

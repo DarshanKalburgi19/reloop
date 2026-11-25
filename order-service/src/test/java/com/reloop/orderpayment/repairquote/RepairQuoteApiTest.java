@@ -26,9 +26,11 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 class RepairQuoteApiTest {
 
-    static final String KEY = "test-internal-key";
-    static final long CUSTOMER = 501L;
-    static final long PROFILE = 77L;
+    public static final String KEY = "test-internal-key";
+    public static final long CUSTOMER = 501L;
+    public static final long PROFILE = 77L;
+    /** product-service Account ID of the repairer who owns PROFILE. */
+    public static final long REPAIRER_ACCOUNT = 601L;
 
     @Autowired
     private MockMvc mvc;
@@ -44,14 +46,14 @@ class RepairQuoteApiTest {
         quotes.deleteAll();
     }
 
-    static String createBody(long requestId, long basePaise) {
+    public static String createBody(long requestId, long basePaise) {
         return """
                 {"repairRequestId":%d,"requestNumber":"RR-20261125-ABCDEFGH","repairerProfileId":%d,
-                 "customerAccountId":%d,"baseAmountPaise":%d,"summary":"Replace screen"}
-                """.formatted(requestId, PROFILE, CUSTOMER, basePaise);
+                 "customerAccountId":%d,"baseAmountPaise":%d,"summary":"Replace screen","repairerAccountId":%d}
+                """.formatted(requestId, PROFILE, CUSTOMER, basePaise, REPAIRER_ACCOUNT);
     }
 
-    static String decisionBody(long requestId, long customerId) {
+    public static String decisionBody(long requestId, long customerId) {
         return "{\"repairRequestId\":%d,\"customerAccountId\":%d,\"note\":\"ok\"}".formatted(requestId, customerId);
     }
 

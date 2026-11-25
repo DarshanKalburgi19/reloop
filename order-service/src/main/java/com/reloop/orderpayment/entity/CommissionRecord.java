@@ -1,6 +1,7 @@
 package com.reloop.orderpayment.entity;
 
 import com.reloop.orderpayment.enums.CommissionStatus;
+import com.reloop.orderpayment.enums.TransactionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,12 +12,9 @@ import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 
 /**
- * The platform's double-entry commission ledger: ONE row per SUCCESSFUL
- * payment recording both fees separately, with the rates frozen at that
- * moment.
- *
- * <p>Never compute ReLoop revenue by summing payments - always read this
- * table (and reverse rows on refunds via {@code REVERSED}).</p>
+ * ReLoop's revenue from ONE successful payment, kept separately from the payment and the payout:
+ * {@code totalCommission = customerFee + providerCommission}. Refunds record the reversed portions; the current
+ * revenue is {@code totalCommission − reversedCustomerFee − reversedProviderCommission}.
  */
 @Entity
 @Table(
@@ -25,19 +23,26 @@ import java.math.BigDecimal;
         @UniqueConstraint(name = "uk_commission_payment", columnNames = "payment_transaction_id"),
         @UniqueConstraint(name = "uk_commission_transaction_id", columnNames = "transaction_id")
     },
-    indexes = @Index(name = "ix_commission_status", columnList = "status")
+    indexes = {
+        @Index(name = "ix_commission_status", columnList = "status"),
+        @Index(name = "ix_commission_type", columnList = "transaction_type")
+    }
 )
 public class CommissionRecord extends BaseEntity {
 
-    /** Same-service FK to the successful payment that generated this row. */
+    /** Database id of the payment (same service). */
     @Column(name = "payment_transaction_id", nullable = false)
     private Long paymentTransactionId;
 
-    /** Business transaction ID copy for easy lookup/reporting. */
+    /** This record's own reference, e.g. COM-20261125-XXXXXXXXXX. */
     @Column(name = "transaction_id", nullable = false, length = 64)
     private String transactionId;
 
-    /** PURCHASE_ORDER or REPAIR_QUOTE - stored as string, no enum coupling. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type", length = 30)
+    private TransactionType transactionType;
+
+    /** PURCHASE_ORDER or REPAIR_QUOTE. */
     @Column(name = "reference_type", nullable = false, length = 30)
     private String referenceType;
 
@@ -56,9 +61,15 @@ public class CommissionRecord extends BaseEntity {
     @Column(name = "provider_commission_paise", nullable = false)
     private Long providerCommissionPaise;
 
-    /** customer fee + provider commission = ReLoop's total take. */
+    /** customer fee + provider commission (ReLoop revenue at payment time). */
     @Column(name = "total_commission_paise", nullable = false)
     private Long totalCommissionPaise;
+
+    @Column(name = "reversed_customer_fee_paise", nullable = false)
+    private Long reversedCustomerFeePaise = 0L;
+
+    @Column(name = "reversed_provider_commission_paise", nullable = false)
+    private Long reversedProviderCommissionPaise = 0L;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "INR";
@@ -68,6 +79,11 @@ public class CommissionRecord extends BaseEntity {
     private CommissionStatus status = CommissionStatus.RECORDED;
 
     public CommissionRecord() {
+    }
+
+    /** ReLoop revenue after refunds. */
+    public long currentRevenuePaise() {
+        return totalCommissionPaise - reversedCustomerFeePaise - reversedProviderCommissionPaise;
     }
 
     public Long getPaymentTransactionId() {
@@ -84,6 +100,14 @@ public class CommissionRecord extends BaseEntity {
 
     public void setTransactionId(String transactionId) {
         this.transactionId = transactionId;
+    }
+
+    public TransactionType getTransactionType() {
+        return transactionType;
+    }
+
+    public void setTransactionType(TransactionType transactionType) {
+        this.transactionType = transactionType;
     }
 
     public String getReferenceType() {
@@ -140,6 +164,22 @@ public class CommissionRecord extends BaseEntity {
 
     public void setTotalCommissionPaise(Long totalCommissionPaise) {
         this.totalCommissionPaise = totalCommissionPaise;
+    }
+
+    public Long getReversedCustomerFeePaise() {
+        return reversedCustomerFeePaise;
+    }
+
+    public void setReversedCustomerFeePaise(Long reversedCustomerFeePaise) {
+        this.reversedCustomerFeePaise = reversedCustomerFeePaise;
+    }
+
+    public Long getReversedProviderCommissionPaise() {
+        return reversedProviderCommissionPaise;
+    }
+
+    public void setReversedProviderCommissionPaise(Long reversedProviderCommissionPaise) {
+        this.reversedProviderCommissionPaise = reversedProviderCommissionPaise;
     }
 
     public String getCurrency() {

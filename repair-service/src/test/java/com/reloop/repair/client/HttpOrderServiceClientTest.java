@@ -44,10 +44,11 @@ class HttpOrderServiceClientTest {
                 .andExpect(jsonPath("$.repairRequestId").value(7))
                 .andExpect(jsonPath("$.requestNumber").value("RR-20261125-ABCDEFGH"))
                 .andExpect(jsonPath("$.baseAmountPaise").value(150000))
+                .andExpect(jsonPath("$.repairerAccountId").value(55))
                 .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON)
                         .body(QUOTE_JSON.formatted("SENT")));
 
-        QuoteView q = client.createQuote(new CreateQuoteCommand(7L, "RR-20261125-ABCDEFGH", 3L, 44L, 150_000L, "Screen"));
+        QuoteView q = client.createQuote(new CreateQuoteCommand(7L, "RR-20261125-ABCDEFGH", 3L, 44L, 150_000L, "Screen", 55L));
 
         assertThat(q.id()).isEqualTo(12L);
         assertThat(q.revision()).isEqualTo(2);
@@ -87,7 +88,7 @@ class HttpOrderServiceClientTest {
     void serverErrorsBecomeBadGateway() {
         server.expect(requestTo(BASE + "/api/internal/repair-quotes")).andRespond(withServerError());
 
-        assertThatThrownBy(() -> client.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x")))
+        assertThatThrownBy(() -> client.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x", 55L)))
                 .isInstanceOfSatisfying(OrderServiceException.class, ex -> assertThat(ex.getStatus()).isEqualTo(502));
     }
 
@@ -95,7 +96,7 @@ class HttpOrderServiceClientTest {
     void unreachableIsServiceUnavailable() {
         HttpOrderServiceClient offline = new HttpOrderServiceClient("http://localhost:1", "k3y");
 
-        assertThatThrownBy(() -> offline.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x")))
+        assertThatThrownBy(() -> offline.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x", 55L)))
                 .isInstanceOfSatisfying(OrderServiceException.class, ex -> assertThat(ex.getStatus()).isEqualTo(503));
     }
 }
