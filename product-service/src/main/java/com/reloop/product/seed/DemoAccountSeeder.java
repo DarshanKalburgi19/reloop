@@ -74,7 +74,7 @@ public class DemoAccountSeeder implements ApplicationRunner {
             return true;
         }
         try {
-            authService.registerRepairer(DemoAccounts.repairer());
+            authService.registerDemoRepairer(DemoAccounts.repairer());
             log.warn("Seeded TEMPORARY demo REPAIRER {} (password in docs/AUTH.md)", DemoAccounts.REPAIRER_EMAIL);
             return true;
         } catch (RepairServiceException ex) {

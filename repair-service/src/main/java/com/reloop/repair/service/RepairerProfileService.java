@@ -11,7 +11,10 @@ import com.reloop.repair.repository.RepairerProfileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Creates and reads repairer workshop profiles. */
+/**
+ * Internal profile creation (called by product-service at repairer registration) and the internal read.
+ * The customer/repairer-facing API is {@link WorkshopProfileService} ({@code /api/repairers}).
+ */
 @Service
 public class RepairerProfileService {
 
@@ -45,6 +48,8 @@ public class RepairerProfileService {
         p.setAcceptsShipping(req.acceptsShipping());
         p.setVerificationStatus(VerificationStatus.UNVERIFIED); // never self-verified
         p.setStatus(RepairerProfileStatus.ACTIVE);
+        p.setDemo(Boolean.TRUE.equals(req.demo()));
+        p.setProfileComplete(RepairerMapper.missingForListing(p).isEmpty()); // false until completed via PUT
         return RepairerProfileResponse.from(profiles.saveAndFlush(p));
     }
 

@@ -122,6 +122,16 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse registerRepairer(RepairerRegistrationRequest req) {
+        return registerRepairer(req, false);
+    }
+
+    /** Same as {@link #registerRepairer(RepairerRegistrationRequest)}, but repair-service labels the workshop as demo data. */
+    @Transactional
+    public AuthResponse registerDemoRepairer(RepairerRegistrationRequest req) {
+        return registerRepairer(req, true);
+    }
+
+    private AuthResponse registerRepairer(RepairerRegistrationRequest req, boolean demo) {
         Account account = createAccount(req.email(), req.password(), AccountRole.REPAIRER, req.name(), req.phone());
 
         Set<RepairMethod> methods = req.repairMethods();
@@ -138,7 +148,8 @@ public class AuthService {
                 req.serviceHours().trim(),
                 methods.contains(RepairMethod.IN_PERSON),
                 methods.contains(RepairMethod.PICKUP_DROPOFF),
-                methods.contains(RepairMethod.SEND_ITEM));
+                methods.contains(RepairMethod.SEND_ITEM),
+                demo);
         RepairerProfileView profile = repairerProfileClient.createProfile(command);
 
         RepairerAccountIdentity identity = new RepairerAccountIdentity();

@@ -1,5 +1,6 @@
 package com.reloop.repair.entity;
 
+import com.reloop.repair.enums.PriceType;
 import com.reloop.repair.enums.RepairServiceCategory;
 import com.reloop.repair.enums.RepairServiceStatus;
 import jakarta.persistence.Column;
@@ -12,6 +13,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * One service a repairer offers ("Phone screen replacement - ₹499").
@@ -39,9 +41,15 @@ public class RepairService extends BaseEntity {
     @Column(name = "category", nullable = false, length = 40)
     private RepairServiceCategory category;
 
-    /** Rough starting price in paise (nullable). */
+    /** Price in paise (nullable at DB level; always set by the workshop profile API). */
     @Column(name = "estimated_price_paise")
     private Long estimatedPricePaise;
+
+    /** Whether {@code estimatedPricePaise} is an exact price or a "starting from" price. */
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'STARTING_FROM'")
+    @Column(name = "price_type", nullable = false, length = 20)
+    private PriceType priceType = PriceType.STARTING_FROM;
 
     @Column(name = "estimated_days")
     private Integer estimatedDays;
@@ -91,6 +99,14 @@ public class RepairService extends BaseEntity {
 
     public void setEstimatedPricePaise(Long estimatedPricePaise) {
         this.estimatedPricePaise = estimatedPricePaise;
+    }
+
+    public PriceType getPriceType() {
+        return priceType;
+    }
+
+    public void setPriceType(PriceType priceType) {
+        this.priceType = priceType;
     }
 
     public Integer getEstimatedDays() {

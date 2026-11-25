@@ -37,13 +37,13 @@ class DemoAccountSeederTest {
         assertThat(seeder.trySeedRepairer()).isTrue();
 
         verify(authService, never()).registerCustomer(any());
-        verify(authService, never()).registerRepairer(any());
+        verify(authService, never()).registerDemoRepairer(any());
     }
 
     @Test
     void repairerSeedingReportsFailureWhenRepairServiceIsDown() {
         when(authService.emailExists(any())).thenReturn(false);
-        when(authService.registerRepairer(any()))
+        when(authService.registerDemoRepairer(any()))
                 .thenThrow(new RepairServiceException(503, "down", null));
 
         assertThat(seeder.trySeedRepairer()).isFalse();

@@ -1,21 +1,40 @@
 package com.reloop.repair.entity;
 
+import com.reloop.repair.enums.AvailabilityStatus;
+import com.reloop.repair.enums.RepairServiceCategory;
 import com.reloop.repair.enums.RepairerProfileStatus;
 import com.reloop.repair.enums.VerificationStatus;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * A repair professional's public profile: workshop location (for the Leaflet
  * map), service hours and accepted delivery modes.
  *
  * <p>{@code accountExternalId} is the product-service Account ID (login) -
- * a plain Long, NO FK across microservices.</p>
+ * a plain Long, NO FK across microservices. Seeded demo workshops that have no login use
+ * negative placeholder IDs (real account IDs are always positive) and {@code demo = true}.</p>
+ *
+ * <p>A profile created at registration only has the basics. It appears in customer search
+ * ({@code profileComplete = true}) once the repairer has added a description, categories,
+ * at least one service with a price, and working hours via {@code POST/PUT /api/repairers}.</p>
  */
 @Entity
 @Table(
@@ -24,7 +43,9 @@ import jakarta.persistence.UniqueConstraint;
     indexes = {
         @Index(name = "ix_profiles_status", columnList = "status"),
         @Index(name = "ix_profiles_city", columnList = "city"),
-        @Index(name = "ix_profiles_business_name", columnList = "business_name")
+        @Index(name = "ix_profiles_business_name", columnList = "business_name"),
+        @Index(name = "ix_profiles_listing", columnList = "status, profile_complete"),
+        @Index(name = "ix_profiles_lat_lng", columnList = "latitude, longitude")
     }
 )
 public class RepairerProfile extends BaseEntity {
@@ -84,7 +105,130 @@ public class RepairerProfile extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private RepairerProfileStatus status = RepairerProfileStatus.ACTIVE;
 
+    /* ── Workshop profile module ───────────────────────────────────────── */
+
+    /** Repair categories the workshop handles (filterable). */
+    @ElementCollection
+    @CollectionTable(name = "repairer_profile_categories",
+            joinColumns = @JoinColumn(name = "repairer_profile_id"),
+            foreignKey = @ForeignKey(name = "fk_profile_categories_profile"),
+            indexes = @Index(name = "ix_profile_categories_category", columnList = "category"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false, length = 40)
+    private Set<RepairServiceCategory> categories = new LinkedHashSet<>();
+
+    /** Structured opening hours; days without an entry are closed. */
+    @ElementCollection
+    @CollectionTable(name = "repairer_working_hours",
+            joinColumns = @JoinColumn(name = "repairer_profile_id"),
+            foreignKey = @ForeignKey(name = "fk_working_hours_profile"))
+    private List<WorkingHours> workingHours = new ArrayList<>();
+
+    /** All services ever offered; removed services are kept as INACTIVE (repair requests reference them). */
+    @OneToMany(mappedBy = "repairerProfile", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @OrderBy("id ASC")
+    private List<RepairService> services = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'AVAILABLE'")
+    @Column(name = "availability", nullable = false, length = 20)
+    private AvailabilityStatus availability = AvailabilityStatus.AVAILABLE;
+
+    @Column(name = "availability_note", length = 200)
+    private String availabilityNote;
+
+    /** Lowest ACTIVE service price in paise (search price sort); null when there are no services. */
+    @Column(name = "starting_price_paise")
+    private Long startingPricePaise;
+
+    /** Average star rating (0 when there are no ratings yet), kept in sync with repairer_reviews. */
+    @ColumnDefault("0")
+    @Column(name = "rating_average", nullable = false)
+    private double ratingAverage;
+
+    @ColumnDefault("0")
+    @Column(name = "rating_count", nullable = false)
+    private int ratingCount;
+
+    /** True when the profile has everything customers need; only complete profiles are searchable. */
+    @ColumnDefault("false")
+    @Column(name = "profile_complete", nullable = false)
+    private boolean profileComplete;
+
+    /** Seeded demo data, not a real business. Shown to customers as {@code demo: true}. */
+    @ColumnDefault("false")
+    @Column(name = "is_demo", nullable = false)
+    private boolean demo;
+
     public RepairerProfile() {
+    }
+
+    public Set<RepairServiceCategory> getCategories() {
+        return categories;
+    }
+
+    public List<WorkingHours> getWorkingHours() {
+        return workingHours;
+    }
+
+    public List<RepairService> getServices() {
+        return services;
+    }
+
+    public AvailabilityStatus getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(AvailabilityStatus availability) {
+        this.availability = availability;
+    }
+
+    public String getAvailabilityNote() {
+        return availabilityNote;
+    }
+
+    public void setAvailabilityNote(String availabilityNote) {
+        this.availabilityNote = availabilityNote;
+    }
+
+    public Long getStartingPricePaise() {
+        return startingPricePaise;
+    }
+
+    public void setStartingPricePaise(Long startingPricePaise) {
+        this.startingPricePaise = startingPricePaise;
+    }
+
+    public double getRatingAverage() {
+        return ratingAverage;
+    }
+
+    public void setRatingAverage(double ratingAverage) {
+        this.ratingAverage = ratingAverage;
+    }
+
+    public int getRatingCount() {
+        return ratingCount;
+    }
+
+    public void setRatingCount(int ratingCount) {
+        this.ratingCount = ratingCount;
+    }
+
+    public boolean isProfileComplete() {
+        return profileComplete;
+    }
+
+    public void setProfileComplete(boolean profileComplete) {
+        this.profileComplete = profileComplete;
+    }
+
+    public boolean isDemo() {
+        return demo;
+    }
+
+    public void setDemo(boolean demo) {
+        this.demo = demo;
     }
 
     public Long getAccountExternalId() {

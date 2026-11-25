@@ -28,7 +28,7 @@ class HttpRepairerProfileClientTest {
 
     private static CreateRepairerProfileCommand command() {
         return new CreateRepairerProfileCommand(7L, "Fix-It", "Phones", "9898989898", "5 CG Road", "Ahmedabad",
-                "380006", 23.0, 72.5, "Mon-Sat", true, false, true);
+                "380006", 23.0, 72.5, "Mon-Sat", true, false, true, false);
     }
 
     @Test

@@ -56,7 +56,7 @@ public final class DemoAccounts {
     public static RepairerRegistrationRequest repairer() {
         return new RepairerRegistrationRequest(
                 "Ravi Mehta", REPAIRER_EMAIL, "+919800000002", REPAIRER_PASSWORD,
-                "Mehta Fix-It Workshop",
+                "Mehta Fix-It Workshop (Demo)",
                 List.of("Mobile phones", "Laptops", "Small appliances"),
                 "5 CG Road, Ellisbridge", "Ahmedabad", "380006",
                 23.0225, 72.5714,
