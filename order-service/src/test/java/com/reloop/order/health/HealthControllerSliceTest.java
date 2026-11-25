@@ -1,0 +1,51 @@
+package com.reloop.order.health;
+
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+/**
+ * Slice test: loads only the web layer (controllers) and replaces
+ * {@link HealthService} with a Mockito mock. This proves the controller
+ * delegates correctly without starting the database.
+ */
+@WebMvcTest(HealthController.class)
+class HealthControllerSliceTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private HealthService healthService;
+
+    @Test
+    void healthReturnsWhatTheServiceProvides() throws Exception {
+        when(healthService.health())
+                .thenReturn(Map.of("service", "order-service", "status", "UP"));
+
+        mockMvc.perform(get("/api/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.service").value("order-service"))
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    void healthServiceIsCalledExactlyOnce() throws Exception {
+        when(healthService.health())
+                .thenReturn(Map.of("service", "order-service", "status", "UP"));
+
+        mockMvc.perform(get("/api/health"));
+
+        verify(healthService, times(1)).health();
+    }
+}

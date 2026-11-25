@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: order-service
+  datasource:
+    # File-based H2 so data survives restarts during the demo.
+    # Each service uses its own database file (own schema, own service).
+    url: jdbc:h2:file:./data/reloop_order;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Create/update tables from entities automatically during the MVP phase.
+      ddl-auto: update
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
