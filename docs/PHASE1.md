@@ -7,7 +7,7 @@ and health endpoints.
 |---|---|---|---|
 | `product-service` (Product & Account) | 8081 | `com.reloop.product` | `product-service/data/reloop_product` |
 | `order-service` (Order & Payment) | 8082 | `com.reloop.order` | `order-service/data/reloop_order` |
-| `repair-service` (Repair & Tracking) | 8083 | `com.reloop.repair` | `order-service` → see `repair-service/data/reloop_repair` |
+| `repair-service` (Repair & Tracking) | 8083 | `com.reloop.repair` | `repair-service/data/reloop_repair` |
 
 ## Prerequisites
 
