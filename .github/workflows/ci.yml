@@ -49,6 +49,20 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Surface failing surefire reports as check-run annotations so failure
+      # details are readable via the GitHub API even without log downloads.
+      - name: Annotate failing tests
+        if: failure()
+        run: |
+          for f in ${{ matrix.service }}/target/surefire-reports/*.txt; do
+            [ -e "$f" ] || continue
+            if grep -qE "Failures: [1-9]|Errors: [1-9]|<<< (FAILURE|ERROR)!" "$f"; then
+              esc=$(sed -e 's/%/%25/g' -e 's/\r//g' "$f" | awk '{printf "%s%%0A", $0}' | cut -c1-8000)
+              echo "::error file=${{ matrix.service }}/pom.xml,title=Failing tests in ${{ matrix.service }}::${esc}"
+            fi
+          done
+          exit 0
+
       - name: Report test totals as commit status
         if: always()
         env:
