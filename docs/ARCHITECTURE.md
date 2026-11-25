@@ -34,8 +34,8 @@ any business features are implemented.
 | Service | Port | Package | Database | Owner | Planned main endpoints (blueprint contract) |
 |---|---|---|---|---|---|
 | Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register/customer`, `POST /api/auth/register/repairer`, `POST /api/auth/login`, `GET /api/auth/me` (see [AUTH.md](AUTH.md)), `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}`, `GET /api/products/{id}/passport`, `POST /api/products/{id}/purchase`, `GET /api/products/mine` (see [MARKETPLACE.md](MARKETPLACE.md)) |
-| Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/orders`, `POST /api/repairs/{id}/quote`, `POST /api/repairs/{id}/approve`, `POST /api/payments/simulate`, `GET /api/transactions/{id}` |
-| Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `POST/GET /api/repairers`, `GET/PUT /api/repairers/{id}`, `GET /api/repairers/nearby`, `GET /api/repairers/me` (see [REPAIRERS.md](REPAIRERS.md)), `POST /api/repair-requests`, `GET/POST /api/repairers/{id}/inventory`, `PATCH /api/repair-requests/{id}/status` |
+| Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/internal/repair-quotes`, `POST /api/internal/repair-quotes/{id}/approve\|reject` (internal, called by repair-service), `POST /api/payments/simulate`, `GET /api/payments/{transactionId}` (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)); planned: `POST /api/orders` |
+| Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `POST/GET /api/repairers`, `GET/PUT /api/repairers/{id}`, `GET /api/repairers/nearby`, `GET /api/repairers/me` (see [REPAIRERS.md](REPAIRERS.md)), `POST /api/repair-requests`, `GET /api/repair-requests/mine\|incoming\|{id}\|{id}/history`, `POST /api/repair-requests/{id}/accept\|reject\|inspect\|quote\|quote/revise\|quote/approve\|quote/reject\|progress\|complete\|cancel`, `PATCH /api/repair-requests/{id}/status`, `POST /api/internal/repair-requests/{id}/payment-confirmation` (internal) (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)); planned: `GET/POST /api/repairers/{id}/inventory` |
 
 Shared (all three, Phase 1): `GET /api/health` and `GET /actuator/health`.
 
@@ -63,6 +63,11 @@ commission research · cloud documentation, presentation, demo video.
    **Repairer module:** the browser calls repair-service directly with the JWT from
    product-service. repair-service verifies it locally with the shared HS256 secret and issuer;
    it never calls product-service to check tokens (see [REPAIRERS.md](REPAIRERS.md)).
+   **Repair workflow:** repair-service → order-service to issue, approve and reject quotes
+   (`/api/internal/repair-quotes…`); order-service → repair-service to confirm a payment
+   (`/api/internal/repair-requests/{id}/payment-confirmation`). Both directions use
+   `X-Internal-Api-Key`. order-service owns the quote amounts and payments; repair-service owns the request
+   and its history and keeps only a snapshot of the current quote (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)).
 2. **Later phases:** synchronous **REST over HTTP** between services using only the
    agreed endpoint contracts above. The frontend calls the same REST APIs.
 3. **Database-per-service:** each service owns its schema. Services never read
@@ -102,9 +107,10 @@ Every service exposes:
 3. Payments are simulations; success, failure and cancellation have distinct
    outcomes; failed payments never confirm orders or create payouts; refunds reverse
    ledger entries.
-4. Repair lifecycle: `REQUESTED → ACCEPTED → INSPECTED → QUOTED → APPROVED → PAID →
-   IN_PROGRESS → COMPLETED`; quote approval is mandatory before payment; work starts
-   only after successful simulated payment.
+4. Repair lifecycle: `REQUESTED → ACCEPTED → INSPECTED → QUOTED → QUOTE_APPROVED →
+   AWAITING_PAYMENT → PAID → IN_PROGRESS → COMPLETED` (plus `REJECTED`, `QUOTE_REJECTED`,
+   `CANCELLED`). Quote approval is mandatory before payment; a revised quote needs fresh approval;
+   work starts only after successful simulated payment (implemented: [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)).
 5. Role-based authorization: customers cannot touch repairer inventory; repairers
    cannot see other repairers' earnings.
 6. Earnings are read from transaction/commission/payout records — never by summing

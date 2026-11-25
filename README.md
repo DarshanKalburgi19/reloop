@@ -96,8 +96,13 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   Customers search by city, category, price and method, or find workshops near a map point
   (Leaflet-ready coordinates). JWT-secured in repair-service. Ten labelled demo workshops across
   Gujarat ([REPAIRERS](docs/REPAIRERS.md)).
+- **Repair booking workflow (complete):** customers book a workshop (category, problem, demo photos,
+  in-person or send-item), approve or reject quotes and follow a timestamped status history; repairers
+  accept/reject, inspect, quote and revise, record progress and complete. Quotes, fees (2% + 2%, frozen
+  per quote) and simulated payments live in order-service, which separately records commission and
+  payout; the two services coordinate only over REST ([REPAIR_WORKFLOW](docs/REPAIR_WORKFLOW.md)).
 
-Next: repair requests & tracking → orders & simulated payments → frontend integration → testing & deployment.
+Next: marketplace orders & payments → reviews, spare parts & delivery tracking → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -107,6 +112,7 @@ Next: repair requests & tracking → orders & simulated payments → frontend in
 - [docs/AUTH.md](docs/AUTH.md) — registration, login, JWT + roles, **demo credentials**, how to test both account types
 - [docs/MARKETPLACE.md](docs/MARKETPLACE.md) — marketplace API, listing/purchase rules, product passport, demo products, curl walkthrough
 - [docs/REPAIRERS.md](docs/REPAIRERS.md) — repairer workshop profiles, search, nearby/map API, authorization, demo workshops
+- [docs/REPAIR_WORKFLOW.md](docs/REPAIR_WORKFLOW.md) — repair booking statuses and rules, quote/payment contracts between services, curl walkthrough, tests
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented in later phases)

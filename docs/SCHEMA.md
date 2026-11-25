@@ -40,7 +40,7 @@ Java `pricePaise` → column `price_paise`.
 |---|---|---|
 | `purchase_orders` | **UNIQUE** `order_number`; all money NOT NULL | `ix_orders_buyer`, `ix_orders_seller`, `ix_orders_status` |
 | `order_items` | FK → `purchase_orders`; `product_external_id` is a plain Long (**no FK**) | `ix_order_items_order`, `ix_order_items_product_external` |
-| `repair_quotes` | **UNIQUE** `(repair_request_id, quote_revision)`; both fee rates + amounts NOT NULL | `ix_quotes_request`, `ix_quotes_status`, `ix_quotes_repairer` |
+| `repair_quotes` | **UNIQUE** `(repair_request_id, quote_revision)`; both fee rates + amounts NOT NULL; status `SENT → APPROVED/REJECTED`, older revisions `SUPERSEDED`; `valid_until` (`reloop.quotes.valid-days`) | `ix_quotes_request`, `ix_quotes_status`, `ix_quotes_repairer` |
 | `payment_transactions` | **UNIQUE** `transaction_id` ⭐; **CHECK** `ck_payments_exactly_one_ref` (exactly one of order/quote); **no PAN/CVV/UPI-PIN columns exist** | `ix_payments_status`, `ix_payments_order`, `ix_payments_quote`, `ix_payments_buyer`, `ix_payments_created` |
 | `commission_records` | **UNIQUE** `payment_transaction_id`, **UNIQUE** `transaction_id`; frozen rates | `ix_commission_status` |
 | `provider_payouts` | **UNIQUE** `payout_reference`, **UNIQUE** `payment_transaction_id`; `net = gross - commission` | `ix_payouts_provider`, `ix_payouts_status` |
@@ -55,8 +55,9 @@ Java `pricePaise` → column `price_paise`.
 | `repairer_working_hours` | FK → `repairer_profiles`; `day_of_week`, `opens_at`, `closes_at` | — |
 | `repairer_reviews` | FK → `repairer_profiles`; **CHECK** `ck_reviews_rating (rating BETWEEN 1 AND 5)`; `is_demo` | `ix_reviews_profile_created(repairer_profile_id, created_at)` |
 | `repair_services` | FK → `repairer_profiles`; estimate in paise; `price_type` FIXED/STARTING_FROM; removed services kept INACTIVE | `ix_services_profile(repairer_profile_id, status)`, `ix_services_category` |
-| `repair_requests` | **UNIQUE** `request_number`; FK → `repairer_profiles`; customer/quote/payment IDs external | `ix_requests_customer`, `ix_requests_profile_status`, `ix_requests_status` |
-| `repair_status_history` | FK → `repair_requests`; append-only | `ix_history_request_time(repair_request_id, created_at)` |
+| `repair_requests` | **UNIQUE** `request_number` (`RR-yyyyMMdd-XXXXXXXX`); FK → `repairer_profiles`; customer/quote/payment IDs external (`latest_quote_id`, `payment_transaction_id`); `problem_description`, `inspection_notes`, `close_reason`; read-only quote snapshot `quote_*` columns (revision, base/fee/total/commission/net paise, summary, estimated days, sent at) copied from order-service; per-step timestamps (`accepted_at` … `closed_at`); optimistic lock `version` | `ix_requests_customer`, `ix_requests_profile_status`, `ix_requests_status` |
+| `repair_request_images` | FK → `repair_requests`; ≤ 5 per request, `/demo-images/...` or `https://` URLs (no hosting yet) | — |
+| `repair_status_history` | FK → `repair_requests`; append-only; `from_status`, `to_status`, actor `CUSTOMER`/`REPAIRER`/`SYSTEM`, account id, note, `created_at` — one row per status change (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)) | `ix_history_request_time(repair_request_id, created_at)` |
 | `spare_parts` | **UNIQUE** `(repairer_profile_id, sku)`; **CHECK** `ck_parts_stock_nonnegative (stock_quantity >= 0)` | `ix_parts_profile_status`, `ix_parts_name` |
 | `inventory_movements` | FK → `spare_parts`, `repair_requests`; signed `quantity_change` | `ix_movements_part_time`, `ix_movements_request`, `ix_movements_type` |
 | `delivery_tracking` | FK → `repair_requests`; map coordinates | `ix_tracking_request(repair_request_id, status)`, `ix_tracking_number` |

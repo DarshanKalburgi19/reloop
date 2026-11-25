@@ -268,6 +268,7 @@ erDiagram
     REPAIRER_PROFILE ||--o{ SPARE_PART : stocks
     REPAIR_SERVICE ||--o{ REPAIR_REQUEST : "optional choice"
     REPAIR_REQUEST ||--o{ REPAIR_STATUS_HISTORY : timeline
+    REPAIR_REQUEST ||--o{ REPAIR_REQUEST_IMAGE : photos
     REPAIR_REQUEST ||--o{ INVENTORY_MOVEMENT : "parts used"
     REPAIR_REQUEST ||--o{ DELIVERY_TRACKING : shipments
     SPARE_PART ||--o{ INVENTORY_MOVEMENT : movements
@@ -344,17 +345,38 @@ erDiagram
         string delivery_mode "enum IN_PERSON|PICKUP_DROP|SHIPPING"
         string item_category "enum RepairServiceCategory"
         string item_description
+        string problem_description
         string customer_notes
-        string status "REQUESTED..COMPLETED - indexed"
+        string inspection_notes
+        string close_reason "reject or cancel reason"
+        string status "12 RepairStatus values - indexed"
         bigint latest_quote_id "ext order-service - no FK"
+        int quote_revision "snapshot of current quote"
+        bigint quote_base_amount_paise "snapshot"
+        bigint quote_customer_fee_paise "snapshot"
+        bigint quote_total_payable_paise "snapshot"
+        bigint quote_repairer_commission_paise "snapshot"
+        bigint quote_repairer_net_paise "snapshot"
+        string quote_summary "snapshot"
+        int quote_estimated_days "snapshot"
+        timestamp quote_sent_at "snapshot"
         bigint payment_transaction_id "ext order-service - no FK"
+        bigint version "optimistic lock"
         timestamp accepted_at
+        timestamp inspected_at
+        timestamp quoted_at
         timestamp approved_at
         timestamp paid_at
         timestamp in_progress_at
         timestamp completed_at
+        timestamp closed_at
         timestamp created_at
         timestamp updated_at
+    }
+    REPAIR_REQUEST_IMAGE {
+        bigint repair_request_id FK
+        string image_url "demo-images path or https"
+        int position "display order"
     }
     REPAIR_STATUS_HISTORY {
         bigint id PK
@@ -434,7 +456,9 @@ flowchart LR
     RQ -- "repair_request_id (ext)" --> RR
     RR -- "customer_account_id" --> ACC
     RR -- "delivery_address_id (ext)" --> ADDR
-    RR -- "latest_quote_id / payment_transaction_id (ext)" --> PT
+    RR -- "latest_quote_id (ext)" --> RQ
+    RR -- "payment_transaction_id (ext)" --> PT
+    PT -- "repair_quote_id" --> RQ
     RP -- "account_external_id" --> ACC
     RAI -- "repairer_profile_id (ext)" --> RP
     OS -. "OrderItem.product_external_id" .-> PRD
