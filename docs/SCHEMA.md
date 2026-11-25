@@ -50,8 +50,11 @@ Java `pricePaise` → column `price_paise`.
 
 | Table | Key constraints | Indexes |
 |---|---|---|
-| `repairer_profiles` | **UNIQUE** `account_external_id` (external ID, no FK) | `ix_profiles_status`, `ix_profiles_city`, `ix_profiles_business_name` |
-| `repair_services` | FK → `repairer_profiles`; estimate in paise | `ix_services_profile(repairer_profile_id, status)`, `ix_services_category` |
+| `repairer_profiles` | **UNIQUE** `account_external_id` (external ID, no FK; negative = demo placeholder); search summary columns `starting_price_paise`, `rating_average`, `rating_count`, `profile_complete`, `availability`, `is_demo` | `ix_profiles_status`, `ix_profiles_city`, `ix_profiles_business_name`, `ix_profiles_listing(status, profile_complete)`, `ix_profiles_lat_lng(latitude, longitude)` |
+| `repairer_profile_categories` | FK → `repairer_profiles`; enum `category` | `ix_profile_categories_category` |
+| `repairer_working_hours` | FK → `repairer_profiles`; `day_of_week`, `opens_at`, `closes_at` | — |
+| `repairer_reviews` | FK → `repairer_profiles`; **CHECK** `ck_reviews_rating (rating BETWEEN 1 AND 5)`; `is_demo` | `ix_reviews_profile_created(repairer_profile_id, created_at)` |
+| `repair_services` | FK → `repairer_profiles`; estimate in paise; `price_type` FIXED/STARTING_FROM; removed services kept INACTIVE | `ix_services_profile(repairer_profile_id, status)`, `ix_services_category` |
 | `repair_requests` | **UNIQUE** `request_number`; FK → `repairer_profiles`; customer/quote/payment IDs external | `ix_requests_customer`, `ix_requests_profile_status`, `ix_requests_status` |
 | `repair_status_history` | FK → `repair_requests`; append-only | `ix_history_request_time(repair_request_id, created_at)` |
 | `spare_parts` | **UNIQUE** `(repairer_profile_id, sku)`; **CHECK** `ck_parts_stock_nonnegative (stock_quantity >= 0)` | `ix_parts_profile_status`, `ix_parts_name` |

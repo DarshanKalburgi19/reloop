@@ -113,7 +113,7 @@ Other behaviour:
 | CUSTOMER | `customer.demo@reloop.local` | `ReLoopDemo#Cust2026` | Asha Patel, Navrangpura, Ahmedabad 380009 |
 | CUSTOMER | `karan.demo@reloop.local` | `ReLoopDemo#Karan2026` | Karan Desai, Surat 395007 — owns the demo store "Karan's Pre-Loved Electronics" |
 | CUSTOMER | `nisha.demo@reloop.local` | `ReLoopDemo#Nisha2026` | Nisha Trivedi, Vadodara 390007 |
-| REPAIRER | `repairer.demo@reloop.local` | `ReLoopDemo#Rep2026` | Ravi Mehta, "Mehta Fix-It Workshop", CG Road, Ahmedabad (23.0225, 72.5714), all 3 repair methods, `UNVERIFIED` |
+| REPAIRER | `repairer.demo@reloop.local` | `ReLoopDemo#Rep2026` | Ravi Mehta, "Mehta Fix-It Workshop (Demo)" (labelled `demo: true`; complete it with `PUT /api/repairers/{id}`, see [REPAIRERS.md](REPAIRERS.md)), CG Road, Ahmedabad (23.0225, 72.5714), all 3 repair methods, `UNVERIFIED` |
 
 - Seeding is idempotent: accounts that already exist are skipped on restart.
 - Seeding goes through `AuthService`, so the same BCrypt hashing and rules apply.
@@ -127,7 +127,7 @@ Other behaviour:
 
 | Property (env var) | Default | Notes |
 |---|---|---|
-| `reloop.jwt.secret` (`RELOOP_JWT_SECRET`) | dev-only value | ≥ 32 bytes, otherwise startup fails; a warning is logged while the dev value is in use |
+| `reloop.jwt.secret` (`RELOOP_JWT_SECRET`) | dev-only value | ≥ 32 bytes, otherwise startup fails; a warning is logged while the dev value is in use. Must be the **same** in product-service and repair-service |
 | `reloop.jwt.ttl-seconds` | `3600` | token lifetime |
 | `reloop.jwt.issuer` | `reloop-product-service` | checked on every request |
 | `reloop.security.bcrypt-strength` | `12` | tests use `4` for speed |
@@ -224,8 +224,9 @@ Inspect stored hashes in the H2 console (`http://localhost:8081/h2-console`, JDB
 - **Stateless tokens can't be revoked early.** A suspended account keeps working until its
   token expires (≤ 1 h). `/me` re-reads the database, and login blocks suspended accounts.
   Refresh tokens and a deny-list are future work.
-- **Only product-service validates tokens today.** order-service and repair-service will verify
-  the same HS256 token with the shared secret when their user-facing endpoints arrive.
+- **product-service and repair-service validate tokens** (repair-service only verifies them, with
+  the same `reloop.jwt.secret` and issuer; see [REPAIRERS.md](REPAIRERS.md)). order-service will
+  do the same when its user-facing endpoints arrive.
 - **Repairer registration spans two services.** It stays consistent through local rollback on
   failure. A crash after repair-service created the profile but before the local commit could
   leave an orphan profile. That is acceptable for an MVP; an outbox or saga is the long-term fix.

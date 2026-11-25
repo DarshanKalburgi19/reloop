@@ -91,8 +91,13 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
 - **Second-hand marketplace (complete):** list, edit, deactivate, browse, keyword search, filters,
   product details, purchase rules, and a product passport with full history. Demo listings in
   Ahmedabad, Surat, Vadodara, Rajkot and Gandhinagar ([MARKETPLACE](docs/MARKETPLACE.md)).
+- **Repairer service providers (complete):** repairers create and edit workshop profiles
+  (categories, expertise, priced services, location, hours, repair methods, availability).
+  Customers search by city, category, price and method, or find workshops near a map point
+  (Leaflet-ready coordinates). JWT-secured in repair-service. Ten labelled demo workshops across
+  Gujarat ([REPAIRERS](docs/REPAIRERS.md)).
 
-Next: repairer system → orders & simulated payments → frontend integration → testing & deployment.
+Next: repair requests & tracking → orders & simulated payments → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -101,6 +106,7 @@ Next: repairer system → orders & simulated payments → frontend integration �
 - [docs/SCHEMA.md](docs/SCHEMA.md) — schema configuration, constraints, indexes, money conventions
 - [docs/AUTH.md](docs/AUTH.md) — registration, login, JWT + roles, **demo credentials**, how to test both account types
 - [docs/MARKETPLACE.md](docs/MARKETPLACE.md) — marketplace API, listing/purchase rules, product passport, demo products, curl walkthrough
+- [docs/REPAIRERS.md](docs/REPAIRERS.md) — repairer workshop profiles, search, nearby/map API, authorization, demo workshops
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented in later phases)

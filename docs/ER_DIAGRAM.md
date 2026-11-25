@@ -261,6 +261,9 @@ erDiagram
 ```mermaid
 erDiagram
     REPAIRER_PROFILE ||--o{ REPAIR_SERVICE : offers
+    REPAIRER_PROFILE ||--o{ REPAIRER_PROFILE_CATEGORY : "repair categories"
+    REPAIRER_PROFILE ||--o{ REPAIRER_WORKING_HOURS : "opening hours"
+    REPAIRER_PROFILE ||--o{ REPAIRER_REVIEW : rated
     REPAIRER_PROFILE ||--o{ REPAIR_REQUEST : receives
     REPAIRER_PROFILE ||--o{ SPARE_PART : stocks
     REPAIR_SERVICE ||--o{ REPAIR_REQUEST : "optional choice"
@@ -287,6 +290,34 @@ erDiagram
         boolean accepts_shipping "delivery mode"
         string verification_status "enum UNVERIFIED|VERIFIED|REJECTED"
         string status "enum ACTIVE|INACTIVE|SUSPENDED - indexed"
+        string availability "enum AVAILABLE|BUSY|UNAVAILABLE"
+        string availability_note
+        bigint starting_price_paise "min active service price - sort"
+        double rating_average "summary of reviews"
+        int rating_count
+        boolean profile_complete "listed in search when ACTIVE and complete"
+        boolean is_demo "seeded demo data"
+        timestamp created_at
+        timestamp updated_at
+    }
+    REPAIRER_PROFILE_CATEGORY {
+        bigint repairer_profile_id FK
+        string category "enum RepairServiceCategory - indexed"
+    }
+    REPAIRER_WORKING_HOURS {
+        bigint repairer_profile_id FK
+        string day_of_week "MONDAY..SUNDAY"
+        time opens_at
+        time closes_at
+    }
+    REPAIRER_REVIEW {
+        bigint id PK
+        bigint repairer_profile_id FK "indexed with created_at"
+        int rating "CHECK 1-5"
+        string comment
+        string reviewer_name
+        bigint customer_account_external_id "ext - nullable"
+        boolean is_demo
         timestamp created_at
         timestamp updated_at
     }
@@ -297,6 +328,7 @@ erDiagram
         string description
         string category "enum RepairServiceCategory - indexed"
         bigint estimated_price_paise "nullable"
+        string price_type "enum FIXED|STARTING_FROM"
         int estimated_days
         string status "enum ACTIVE|INACTIVE"
         timestamp created_at
