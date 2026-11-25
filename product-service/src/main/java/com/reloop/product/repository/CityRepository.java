@@ -13,4 +13,7 @@ public interface CityRepository extends JpaRepository<City, Long> {
 
     List<City> findByNameContainingIgnoreCase(String name);
 
+    /** Exact, case-insensitive lookup used at registration ("pune" finds "Pune"). */
+    Optional<City> findFirstByNameIgnoreCase(String name);
+
 }

@@ -13,4 +13,7 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
 
     List<Address> findByAccount_Id(Long accountId);
 
+    /** The account's default address (customers get one at registration). */
+    Optional<Address> findFirstByAccount_IdAndIsDefaultTrue(Long accountId);
+
 }

@@ -96,6 +96,7 @@ simulated payments → Phase 5 frontend integration → Phase 6 testing & deploy
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — initial architecture, API contracts, ownership
 - [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) — Mermaid ER diagrams for all three services
 - [docs/SCHEMA.md](docs/SCHEMA.md) — schema configuration, constraints, indexes, money conventions
+- [docs/AUTH.md](docs/AUTH.md) — registration, login, JWT + roles, **demo credentials**, how to test both account types
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented in later phases)

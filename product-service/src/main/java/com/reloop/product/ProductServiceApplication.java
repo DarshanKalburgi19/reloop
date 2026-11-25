@@ -2,6 +2,7 @@ package com.reloop.product;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 
 /**
  * Entry point of the Product & Account Service (port 8081).
@@ -12,8 +13,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *       package for components (controllers, services, repositories).</li>
  *   <li>{@code main} starts the embedded web server.</li>
  * </ul>
+ *
+ * <p>{@link UserDetailsServiceAutoConfiguration} is excluded: ReLoop authenticates with its own
+ * accounts table and JWTs, so Spring Boot's generated in-memory "user" (and its logged random
+ * password) must not exist.</p>
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 public class ProductServiceApplication {
 
     public static void main(String[] args) {
