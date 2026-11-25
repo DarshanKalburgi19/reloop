@@ -58,8 +58,8 @@ Java `pricePaise` → column `price_paise`.
 | `repair_requests` | **UNIQUE** `request_number` (`RR-yyyyMMdd-XXXXXXXX`); FK → `repairer_profiles`; customer/quote/payment IDs external (`latest_quote_id`, `payment_transaction_id`); `problem_description`, `inspection_notes`, `close_reason`; read-only quote snapshot `quote_*` columns (revision, base/fee/total/commission/net paise, summary, estimated days, sent at) copied from order-service; per-step timestamps (`accepted_at` … `closed_at`); optimistic lock `version` | `ix_requests_customer`, `ix_requests_profile_status`, `ix_requests_status` |
 | `repair_request_images` | FK → `repair_requests`; ≤ 5 per request, `/demo-images/...` or `https://` URLs (no hosting yet) | — |
 | `repair_status_history` | FK → `repair_requests`; append-only; `from_status`, `to_status`, actor `CUSTOMER`/`REPAIRER`/`SYSTEM`, account id, note, `created_at` — one row per status change (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)) | `ix_history_request_time(repair_request_id, created_at)` |
-| `spare_parts` | **UNIQUE** `(repairer_profile_id, sku)`; **CHECK** `ck_parts_stock_nonnegative (stock_quantity >= 0)` | `ix_parts_profile_status`, `ix_parts_name` |
-| `inventory_movements` | FK → `spare_parts`, `repair_requests`; signed `quantity_change` | `ix_movements_part_time`, `ix_movements_request`, `ix_movements_type` |
+| `spare_parts` | **UNIQUE** `(repairer_profile_id, sku)`; **CHECK** `ck_parts_stock_nonnegative (stock_quantity >= 0 AND reorder_level >= 0 AND unit_cost_paise >= 0)` | `ix_parts_profile_status`, `ix_parts_profile_category`, `ix_parts_name` |
+| `inventory_movements` | FK → `repairer_profiles`, `spare_parts`, `repair_requests`; signed `quantity_change`; **CHECK** `ck_movements_valid (quantity_change <> 0 AND stock_after >= 0 AND unit_cost_paise >= 0)`; types STOCK_IN / USED_IN_REPAIR / ADJUSTMENT (see [INVENTORY.md](INVENTORY.md)) | `ix_movements_part_time`, `ix_movements_profile_date`, `ix_movements_request`, `ix_movements_type` |
 | `delivery_tracking` | FK → `repair_requests`; map coordinates | `ix_tracking_request(repair_request_id, status)`, `ix_tracking_number` |
 
 ## Money & rate conventions

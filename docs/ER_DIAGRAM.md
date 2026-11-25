@@ -272,6 +272,7 @@ erDiagram
     REPAIR_REQUEST ||--o{ INVENTORY_MOVEMENT : "parts used"
     REPAIR_REQUEST ||--o{ DELIVERY_TRACKING : shipments
     SPARE_PART ||--o{ INVENTORY_MOVEMENT : movements
+    REPAIRER_PROFILE ||--o{ INVENTORY_MOVEMENT : owns
 
     REPAIRER_PROFILE {
         bigint id PK
@@ -391,26 +392,29 @@ erDiagram
     }
     SPARE_PART {
         bigint id PK
-        bigint repairer_profile_id FK "UK with sku"
-        string sku "unique per repairer"
-        string name "indexed"
+        bigint repairer_profile_id FK "API repairerId; UK with sku"
+        string sku "unique per repairer, generated if omitted"
+        string name "API partName, indexed"
+        string category "enum SparePartCategory"
         string description
-        bigint unit_cost_paise "integer paise"
-        int stock_quantity "CHECK >= 0"
-        int reorder_level
+        bigint unit_cost_paise "API unitCost, integer paise, CHECK >= 0"
+        int stock_quantity "API quantity, CHECK >= 0"
+        int reorder_level "API lowStockThreshold, CHECK >= 0"
         string status "enum ACTIVE|DISCONTINUED"
         timestamp created_at
         timestamp updated_at
     }
     INVENTORY_MOVEMENT {
         bigint id PK
+        bigint repairer_profile_id FK "API repairerId, indexed with movement_date"
         bigint spare_part_id FK "indexed with created_at"
-        bigint repair_request_id FK "nullable, indexed"
-        string movement_type "RECEIVED|CONSUMED|ADJUSTMENT|RETURNED"
-        int quantity_change "signed"
-        int stock_after "audit snapshot"
-        bigint unit_cost_paise
+        bigint repair_request_id FK "nullable, required for USED_IN_REPAIR"
+        string movement_type "STOCK_IN|USED_IN_REPAIR|ADJUSTMENT"
+        int quantity_change "signed, CHECK <> 0"
+        int stock_after "audit snapshot, CHECK >= 0"
+        bigint unit_cost_paise "cost at movement time"
         string note
+        timestamp movement_date "API movementDate"
         timestamp created_at
         timestamp updated_at
     }

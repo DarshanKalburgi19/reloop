@@ -101,8 +101,14 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   accept/reject, inspect, quote and revise, record progress and complete. Quotes, fees (2% + 2%, frozen
   per quote) and simulated payments live in order-service, which separately records commission and
   payout; the two services coordinate only over REST ([REPAIR_WORKFLOW](docs/REPAIR_WORKFLOW.md)).
+- **Spare-parts inventory (complete):** each repairer manages their own parts (name, category, quantity,
+  purchase cost, low-stock threshold). Every stock change is recorded as a movement: stock received,
+  used in a repair (linked to a paid or in-progress repair request), or adjusted with a reason.
+  Quantities can never go negative (row locks, CHECK constraint), and only the owner can change them.
+  Low-stock alerts. Inventory value (quantity × cost) is reported separately from repair earnings
+  ([INVENTORY](docs/INVENTORY.md)).
 
-Next: marketplace orders & payments → reviews, spare parts & delivery tracking → frontend integration → testing & deployment.
+Next: marketplace orders & payments → reviews & delivery tracking → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -113,6 +119,7 @@ Next: marketplace orders & payments → reviews, spare parts & delivery tracking
 - [docs/MARKETPLACE.md](docs/MARKETPLACE.md) — marketplace API, listing/purchase rules, product passport, demo products, curl walkthrough
 - [docs/REPAIRERS.md](docs/REPAIRERS.md) — repairer workshop profiles, search, nearby/map API, authorization, demo workshops
 - [docs/REPAIR_WORKFLOW.md](docs/REPAIR_WORKFLOW.md) — repair booking statuses and rules, quote/payment contracts between services, curl walkthrough, tests
+- [docs/INVENTORY.md](docs/INVENTORY.md) — repairer spare-parts inventory: model, stock rules, low-stock alerts, valuation, API, curl walkthrough, tests
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented in later phases)

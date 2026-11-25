@@ -84,6 +84,8 @@ public class SecurityConfig {
                     path.matcher(HttpMethod.GET, "/api/repairers"),
                     path.matcher(HttpMethod.GET, "/api/repairers/*")).permitAll()
                 .requestMatchers(path.matcher("/api/repairers/**")).hasRole("REPAIRER")
+                // spare-parts inventory: the owning repairer only (ownership is enforced in InventoryService)
+                .requestMatchers(path.matcher("/api/inventory/**")).hasRole("REPAIRER")
                 .anyRequest().authenticated())
             .addFilterBefore(new JwtAuthenticationFilter(verifier), UsernamePasswordAuthenticationFilter.class);
         return http.build();

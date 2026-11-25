@@ -12,6 +12,7 @@ import java.util.Map;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -112,7 +113,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({ProfileAlreadyExistsException.class, ProfileStateException.class, DataIntegrityViolationException.class})
     public ResponseEntity<Map<String, Object>> conflict(RuntimeException ex, HttpServletRequest req) {
-        String message = ex instanceof DataIntegrityViolationException ? "Profile conflicts with existing data" : ex.getMessage();
+        String message = ex instanceof DataIntegrityViolationException ? "The request conflicts with existing data" : ex.getMessage();
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body(HttpStatus.CONFLICT, message, req));
     }
 
@@ -145,6 +146,31 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ProfileNotFoundException.class)
     public ResponseEntity<Map<String, Object>> notFound(ProfileNotFoundException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body(HttpStatus.NOT_FOUND, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(SparePartNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> partNotFound(SparePartNotFoundException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body(HttpStatus.NOT_FOUND, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<Map<String, Object>> insufficientStock(InsufficientStockException ex, HttpServletRequest req) {
+        Map<String, Object> body = body(HttpStatus.CONFLICT, ex.getMessage(), req);
+        body.put("sparePartId", ex.getSparePartId());
+        body.put("availableQuantity", ex.getAvailable());
+        body.put("requestedQuantity", ex.getRequested());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(InventoryConflictException.class)
+    public ResponseEntity<Map<String, Object>> inventoryConflict(InventoryConflictException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body(HttpStatus.CONFLICT, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> locked(PessimisticLockingFailureException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body(HttpStatus.CONFLICT,
+                "This item is being updated by another request. Try again in a moment.", req));
     }
 
     /* ───────────────────────────── helpers ───────────────────────────── */
