@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -113,6 +114,32 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> conflict(RuntimeException ex, HttpServletRequest req) {
         String message = ex instanceof DataIntegrityViolationException ? "Profile conflicts with existing data" : ex.getMessage();
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body(HttpStatus.CONFLICT, message, req));
+    }
+
+    @ExceptionHandler(RepairStateException.class)
+    public ResponseEntity<Map<String, Object>> repairState(RepairStateException ex, HttpServletRequest req) {
+        Map<String, Object> body = body(HttpStatus.CONFLICT, ex.getMessage(), req);
+        body.put("currentStatus", ex.getCurrentStatus());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler({RepairerUnavailableException.class, OptimisticLockingFailureException.class})
+    public ResponseEntity<Map<String, Object>> busy(RuntimeException ex, HttpServletRequest req) {
+        String message = ex instanceof OptimisticLockingFailureException
+                ? "This repair request was changed by someone else at the same time. Reload it and try again."
+                : ex.getMessage();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body(HttpStatus.CONFLICT, message, req));
+    }
+
+    @ExceptionHandler(OrderServiceException.class)
+    public ResponseEntity<Map<String, Object>> orderService(OrderServiceException ex, HttpServletRequest req) {
+        HttpStatus status = HttpStatus.valueOf(ex.getStatus());
+        return ResponseEntity.status(status).body(body(status, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(RepairRequestNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> repairNotFound(RepairRequestNotFoundException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body(HttpStatus.NOT_FOUND, ex.getMessage(), req));
     }
 
     @ExceptionHandler(ProfileNotFoundException.class)

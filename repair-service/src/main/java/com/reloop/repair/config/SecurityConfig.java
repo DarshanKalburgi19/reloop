@@ -28,6 +28,9 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  *       {@code GET /api/repairers/me}. Ownership (only your own profile) is checked in the service.</li>
  *   <li><b>Internal:</b> {@code /api/repairer-profiles} is open at this level; creation requires the
  *       {@code X-Internal-Api-Key} header, checked in the controller.</li>
+ *   <li><b>Repair requests:</b> {@code /api/repair-requests/**} need a token; roles via {@code @PreAuthorize},
+ *       participant checks (own request / assigned workshop) in the service.</li>
+ *   <li><b>Internal:</b> {@code /api/internal/**} (order-service callbacks) check {@code X-Internal-Api-Key}.</li>
  *   <li>Everything else needs a valid token. 401/403 are JSON.</li>
  * </ul>
  */
@@ -69,6 +72,12 @@ public class SecurityConfig {
                 .requestMatchers(
                     path.matcher(HttpMethod.POST, "/api/repairer-profiles"),
                     path.matcher(HttpMethod.GET, "/api/repairer-profiles/*")).permitAll()
+                // other internal service-to-service endpoints (X-Internal-Api-Key checked in the controllers)
+                .requestMatchers(path.matcher("/api/internal/**")).permitAll()
+                // bundled placeholder images for repair requests
+                .requestMatchers(
+                    path.matcher(HttpMethod.GET, "/demo-images/**"),
+                    path.matcher(HttpMethod.GET, "/api/repair-requests/demo-images")).permitAll()
                 // repairer workshop profiles: reads are public, writes need a REPAIRER
                 .requestMatchers(path.matcher(HttpMethod.GET, "/api/repairers/me")).hasRole("REPAIRER")
                 .requestMatchers(

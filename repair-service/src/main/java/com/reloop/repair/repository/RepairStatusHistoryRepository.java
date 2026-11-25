@@ -13,4 +13,7 @@ public interface RepairStatusHistoryRepository extends JpaRepository<RepairStatu
 
     List<RepairStatusHistory> findByRepairRequest_IdOrderByCreatedAtAsc(Long repairRequestId);
 
+    /** Timeline order; the id breaks ties between entries written in the same millisecond. */
+    List<RepairStatusHistory> findByRepairRequest_IdOrderByCreatedAtAscIdAsc(Long repairRequestId);
+
 }
