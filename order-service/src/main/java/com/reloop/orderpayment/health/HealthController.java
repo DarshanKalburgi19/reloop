@@ -1,4 +1,4 @@
-package com.reloop.order.health;
+package com.reloop.orderpayment.health;
 
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;

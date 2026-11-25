@@ -6,7 +6,7 @@ and health endpoints.
 | Service | Port | Package | H2 database file |
 |---|---|---|---|
 | `product-service` (Product & Account) | 8081 | `com.reloop.product` | `product-service/data/reloop_product` |
-| `order-service` (Order & Payment) | 8082 | `com.reloop.order` | `order-service/data/reloop_order` |
+| `order-service` (Order & Payment) | 8082 | `com.reloop.orderpayment` | `order-service/data/reloop_order` |
 | `repair-service` (Repair & Tracking) | 8083 | `com.reloop.repair` | `repair-service/data/reloop_repair` |
 
 ## Prerequisites
@@ -60,7 +60,7 @@ Each service ships 6 tests:
 5. `HealthControllerSliceTest.healthReturnsWhatTheServiceProvides` — controller delegates to mocked service.
 6. `HealthControllerSliceTest.healthServiceIsCalledExactlyOnce` — Mockito verification.
 
-Tests always run against in-memory H2 (`src/test/resources/application.yml` overrides the main config),
+Tests always run against in-memory H2 (`src/test/resources/application.properties` overrides the main config),
 so demo data files are never touched.
 
 ## Expected output

@@ -1,4 +1,4 @@
-package com.reloop.order;
+package com.reloop.orderpayment;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *
  * <p>This class does two things only:</p>
  * <ul>
- *   <li>{@code @SpringBootApplication} tells Spring Boot to scan the {@code com.reloop.order}
+ *   <li>{@code @SpringBootApplication} tells Spring Boot to scan the {@code com.reloop.orderpayment}
  *       package for components (controllers, services, repositories).</li>
  *   <li>{@code main} starts the embedded web server.</li>
  * </ul>
