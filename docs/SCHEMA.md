@@ -1,0 +1,90 @@
+# ReLoop — Initial Schema Configuration
+
+## How the schema is created
+
+Each service generates **its own** schema from its JPA entities at startup —
+there is no shared database and no cross-service foreign key.
+
+| Environment | Property | Effect |
+|---|---|---|
+| Runtime (H2 file) | `spring.jpa.hibernate.ddl-auto=update` | Creates/alters tables in `data/reloop_<svc>` on startup, keeps existing rows |
+| Tests (H2 in-memory) | `spring.jpa.hibernate.ddl-auto=create-drop` | Fresh schema per test JVM, dropped on exit |
+| PostgreSQL (later) | switch `spring.datasource.*` + keep `update` (or export DDL once via `ddl-auto=validate`) | Same entities, no code change |
+
+Config locations: `product-service/src/main/resources/application.properties`,
+`order-service/...`, `repair-service/...` (and the `src/test/resources/` twins).
+
+Naming: Spring Boot default `CamelCaseToSnakeCasePhysicalNamingStrategy` —
+Java `pricePaise` → column `price_paise`.
+
+## Physical model summary
+
+### product-service (`reloop_product`)
+
+| Table | Key constraints | Indexes |
+|---|---|---|
+| `accounts` | **UNIQUE** `email`; `role`/`status` NOT NULL | `ix_accounts_role_status(role, status)` |
+| `customer_accounts` | **UNIQUE** `account_id`; FK → `accounts` | `ix_customer_accounts_name(last_name, first_name)` |
+| `repairer_account_identities` | **UNIQUE** `account_id`, **UNIQUE** `repairer_profile_id`; FK → `accounts` | `ix_rai_verification(verification_status)` |
+| `cities` | `name`/`state` NOT NULL | `ix_cities_name`, `ix_cities_state` |
+| `addresses` | FK → `accounts`, `cities`; `status` NOT NULL | `ix_addresses_account`, `ix_addresses_city`, `ix_addresses_pincode` |
+| `stores` | FK → `accounts`, `cities`; `status` NOT NULL | `ix_stores_owner`, `ix_stores_city`, `ix_stores_name` |
+| `products` | FK → `accounts`, `stores`; `price_paise` NOT NULL (Long) | `ix_products_seller_status`, `ix_products_title`, `ix_products_category`, `ix_products_store` |
+| `product_images` | FK → `products` (cascade delete via orphanRemoval) | `ix_product_images_product(product_id, sort_order)` |
+
+### order-service (`reloop_order`)
+
+| Table | Key constraints | Indexes |
+|---|---|---|
+| `purchase_orders` | **UNIQUE** `order_number`; all money NOT NULL | `ix_orders_buyer`, `ix_orders_seller`, `ix_orders_status` |
+| `order_items` | FK → `purchase_orders`; `product_external_id` is a plain Long (**no FK**) | `ix_order_items_order`, `ix_order_items_product_external` |
+| `repair_quotes` | **UNIQUE** `(repair_request_id, quote_revision)`; both fee rates + amounts NOT NULL | `ix_quotes_request`, `ix_quotes_status`, `ix_quotes_repairer` |
+| `payment_transactions` | **UNIQUE** `transaction_id` ⭐; **CHECK** `ck_payments_exactly_one_ref` (exactly one of order/quote); **no PAN/CVV/UPI-PIN columns exist** | `ix_payments_status`, `ix_payments_order`, `ix_payments_quote`, `ix_payments_buyer`, `ix_payments_created` |
+| `commission_records` | **UNIQUE** `payment_transaction_id`, **UNIQUE** `transaction_id`; frozen rates | `ix_commission_status` |
+| `provider_payouts` | **UNIQUE** `payout_reference`, **UNIQUE** `payment_transaction_id`; `net = gross - commission` | `ix_payouts_provider`, `ix_payouts_status` |
+| `refund_records` | **UNIQUE** `refund_reference`; reversed commission tracked | `ix_refunds_payment`, `ix_refunds_status` |
+
+### repair-service (`reloop_repair`)
+
+| Table | Key constraints | Indexes |
+|---|---|---|
+| `repairer_profiles` | **UNIQUE** `account_external_id` (external ID, no FK) | `ix_profiles_status`, `ix_profiles_city`, `ix_profiles_business_name` |
+| `repair_services` | FK → `repairer_profiles`; estimate in paise | `ix_services_profile(repairer_profile_id, status)`, `ix_services_category` |
+| `repair_requests` | **UNIQUE** `request_number`; FK → `repairer_profiles`; customer/quote/payment IDs external | `ix_requests_customer`, `ix_requests_profile_status`, `ix_requests_status` |
+| `repair_status_history` | FK → `repair_requests`; append-only | `ix_history_request_time(repair_request_id, created_at)` |
+| `spare_parts` | **UNIQUE** `(repairer_profile_id, sku)`; **CHECK** `ck_parts_stock_nonnegative (stock_quantity >= 0)` | `ix_parts_profile_status`, `ix_parts_name` |
+| `inventory_movements` | FK → `spare_parts`, `repair_requests`; signed `quantity_change` | `ix_movements_part_time`, `ix_movements_request`, `ix_movements_type` |
+| `delivery_tracking` | FK → `repair_requests`; map coordinates | `ix_tracking_request(repair_request_id, status)`, `ix_tracking_number` |
+
+## Money & rate conventions
+
+- **Amounts**: `*_paise BIGINT` — ₹1 = 100 paise. Never `double`/`float`.
+- **Rates**: `DECIMAL(8,6)` — `0.0200` = 2%. Copied onto every quote,
+  transaction and commission row at creation time, **never re-read from
+  config later**.
+- **Example** (blueprint): repair ₹1,000 → `base=100000`, customer fee 2% =
+  `2000`, customer pays `102000`; repairer commission 2% = `2000`, repairer
+  net `98000`; ReLoop total `4000` paise (₹40).
+
+## Verification
+
+Constraint coverage is proven by tests (not just asserted):
+
+- `AccountRepositoryTest` — unique email, timestamps, paise price
+- `PaymentConstraintTest` — unique transaction ID, exactly-one-reference
+  CHECK, unique order number, frozen-rate commission ledger
+- `RepairSchemaTest` — unique profile per account, unique SKU per repairer,
+  `stock >= 0` CHECK, status-history queries
+
+```bash
+mvn -f product-service/pom.xml test
+mvn -f order-service/pom.xml test
+mvn -f repair-service/pom.xml test
+```
+
+Inspect a live schema: start a service, open `http://localhost:808X/h2-console`
+(JDBC URL `jdbc:h2:file:./data/reloop_<svc>`, user `sa`, empty password) and run
+`SCRIPT NODATA AS SELECT` or browse the table list.
+
+> Phase 1 rule reminder: `data/` directories are git-ignored; deleting them
+> simply regenerates the schema on next startup (`ddl-auto=update`).
