@@ -3,6 +3,7 @@ package com.reloop.orderpayment.service;
 import com.reloop.orderpayment.client.ProductSale;
 import com.reloop.orderpayment.client.ProductServiceClient;
 import com.reloop.orderpayment.config.OrderProperties;
+import com.reloop.orderpayment.dto.order.InternalOrderView;
 import com.reloop.orderpayment.dto.order.OrderView;
 import com.reloop.orderpayment.entity.OrderItem;
 import com.reloop.orderpayment.entity.PaymentTransaction;
@@ -141,6 +142,16 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderView get(AuthenticatedAccount caller, Long orderId) {
         return view(visible(caller, orderId));
+    }
+
+    /** Service-to-service view of any order (no amounts); used by repair-service for delivery tracking. */
+    @Transactional(readOnly = true)
+    public InternalOrderView internalView(Long orderId) {
+        PurchaseOrder o = orders.findById(orderId)
+                .orElseThrow(() -> new NotFoundException("Order " + orderId + " not found"));
+        String title = o.getItems().stream().findFirst().map(OrderItem::getProductTitleSnapshot).orElse(null);
+        return new InternalOrderView(o.getId(), o.getOrderNumber(), o.getStatus().name(), o.getBuyerAccountId(),
+                o.getSellerAccountId(), o.getProductExternalId(), title, o.getPaidAt());
     }
 
     /** The caller's orders as buyer ({@code role=buyer}, default) or seller ({@code role=seller}), newest first. */

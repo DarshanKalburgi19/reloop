@@ -12,7 +12,7 @@ microservices plus (later) the shared frontend.
 |---|---|---|---|---|---|
 | Product & Account | 8081 | `product-service/` | `com.reloop.product` | PC1 | Registration, login, customer/repairer account separation, product listings, customer dashboard |
 | Order & Payment | 8082 | `order-service/` | `com.reloop.orderpayment` | PC2 | Purchase orders, repair quotes/approvals, simulated payments, commission ledger |
-| Repair & Tracking | 8083 | `repair-service/` | `com.reloop.repair` | PC3 | Repairer profiles, locations, repair booking/status, inventory, repairer dashboard |
+| Repair & Tracking | 8083 | `repair-service/` | `com.reloop.repair` | PC3 | Repairer profiles, locations, repair booking/status, inventory, simulated delivery tracking, repairer dashboard |
 
 **Account rule:** there are exactly two account types — `CUSTOMER` and `REPAIRER`.
 They are registered through separate flows; a customer can never convert an account
@@ -116,8 +116,15 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   duplicate payments are blocked. Refunds are proportional and reverse the ledger. Receipts can be printed or
   downloaded. Customer, seller and repairer dashboards read the same records. No real money, gateway, or card or
   bank data ([PAYMENTS](docs/PAYMENTS.md)).
+- **Delivery tracking (complete, simulated):** store-to-customer (paid marketplace orders), customer-to-repairer
+  and repairer-to-customer legs. Each has a `TRK-SIM-…` tracking ID, origin and destination taken from 16 predefined
+  Gujarat demo locations, a simulated current position, a status (`BOOKED → PICKED_UP → IN_TRANSIT →
+  NEAR_DESTINATION → DELIVERED`), an estimated arrival and a saved coordinate history. The marker moves only when the
+  demo "advance" button is pressed. Both parties see identical data. A Leaflet + OpenStreetMap demo page is at
+  `http://localhost:8083/tracking-demo.html`. No GPS or courier integration, and every response says so
+  ([DELIVERY_TRACKING](docs/DELIVERY_TRACKING.md)).
 
-Next: reviews & delivery tracking → frontend integration → testing & deployment.
+Next: reviews → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -130,6 +137,7 @@ Next: reviews & delivery tracking → frontend integration → testing & deploym
 - [docs/REPAIR_WORKFLOW.md](docs/REPAIR_WORKFLOW.md) — repair booking statuses and rules, quote/payment contracts between services, curl walkthrough, tests
 - [docs/INVENTORY.md](docs/INVENTORY.md) — repairer spare-parts inventory: model, stock rules, low-stock alerts, valuation, API, curl walkthrough, tests
 - [docs/PAYMENTS.md](docs/PAYMENTS.md) — orders, fees and commission, simulated payments, refunds and ledger, receipts, dashboards, API, curl walkthrough, tests
+- [docs/DELIVERY_TRACKING.md](docs/DELIVERY_TRACKING.md) — simulated delivery tracking: three legs, statuses, demo locations, ETA, history, access rules, API, Leaflet/OSM frontend integration, curl walkthrough, tests
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented; see docs/PAYMENTS.md)

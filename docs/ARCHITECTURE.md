@@ -34,8 +34,8 @@ any business features are implemented.
 | Service | Port | Package | Database | Owner | Planned main endpoints (blueprint contract) |
 |---|---|---|---|---|---|
 | Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register/customer`, `POST /api/auth/register/repairer`, `POST /api/auth/login`, `GET /api/auth/me` (see [AUTH.md](AUTH.md)), `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}`, `GET /api/products/{id}/passport`, `POST /api/products/{id}/purchase`, `GET /api/products/mine` (see [MARKETPLACE.md](MARKETPLACE.md)) |
-| Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/internal/repair-quotes`, `POST /api/internal/repair-quotes/{id}/approve\|reject` (internal, called by repair-service), `POST /api/payments/simulate`, `GET /api/payments/{transactionId}`, `POST /api/orders`, `GET /api/orders[/{id}]`, `POST /api/orders/{id}/cancel`, `GET /api/transactions/{id}[/receipt\|/ledger]`, `POST /api/transactions/{id}/refunds`, `GET /api/customers/{id}/payments`, `GET /api/providers/{id}/earnings\|payouts`, `GET /api/fee-rates`, `PUT/DELETE /api/internal/fee-rates/{type}`, `POST /api/internal/transactions/{id}/refunds` (see [PAYMENTS.md](PAYMENTS.md)) |
-| Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `POST/GET /api/repairers`, `GET/PUT /api/repairers/{id}`, `GET /api/repairers/nearby`, `GET /api/repairers/me` (see [REPAIRERS.md](REPAIRERS.md)), `POST /api/repair-requests`, `GET /api/repair-requests/mine\|incoming\|{id}\|{id}/history`, `POST /api/repair-requests/{id}/accept\|reject\|inspect\|quote\|quote/revise\|quote/approve\|quote/reject\|progress\|complete\|cancel`, `PATCH /api/repair-requests/{id}/status`, `POST /api/internal/repair-requests/{id}/payment-confirmation` (internal) (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)), `GET/POST /api/inventory/parts`, `GET/PATCH /api/inventory/parts/{id}`, `POST /api/inventory/parts/{id}/stock-in\|use\|adjust\|discontinue\|reactivate`, `GET /api/inventory/parts/{id}/movements`, `GET /api/inventory/movements\|low-stock\|summary`, `GET /api/inventory/repair-requests/{id}/parts` (REPAIRER, own stock only; see [INVENTORY.md](INVENTORY.md)) |
+| Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/internal/repair-quotes`, `POST /api/internal/repair-quotes/{id}/approve\|reject` (internal, called by repair-service), `GET /api/internal/orders/{id}` (internal, called by repair-service for delivery tracking), `POST /api/payments/simulate`, `GET /api/payments/{transactionId}`, `POST /api/orders`, `GET /api/orders[/{id}]`, `POST /api/orders/{id}/cancel`, `GET /api/transactions/{id}[/receipt\|/ledger]`, `POST /api/transactions/{id}/refunds`, `GET /api/customers/{id}/payments`, `GET /api/providers/{id}/earnings\|payouts`, `GET /api/fee-rates`, `PUT/DELETE /api/internal/fee-rates/{type}`, `POST /api/internal/transactions/{id}/refunds` (see [PAYMENTS.md](PAYMENTS.md)) |
+| Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `POST/GET /api/repairers`, `GET/PUT /api/repairers/{id}`, `GET /api/repairers/nearby`, `GET /api/repairers/me` (see [REPAIRERS.md](REPAIRERS.md)), `POST /api/repair-requests`, `GET /api/repair-requests/mine\|incoming\|{id}\|{id}/history`, `POST /api/repair-requests/{id}/accept\|reject\|inspect\|quote\|quote/revise\|quote/approve\|quote/reject\|progress\|complete\|cancel`, `PATCH /api/repair-requests/{id}/status`, `POST /api/internal/repair-requests/{id}/payment-confirmation` (internal) (see [REPAIR_WORKFLOW.md](REPAIR_WORKFLOW.md)), `GET/POST /api/inventory/parts`, `GET/PATCH /api/inventory/parts/{id}`, `POST /api/inventory/parts/{id}/stock-in\|use\|adjust\|discontinue\|reactivate`, `GET /api/inventory/parts/{id}/movements`, `GET /api/inventory/movements\|low-stock\|summary`, `GET /api/inventory/repair-requests/{id}/parts` (REPAIRER, own stock only; see [INVENTORY.md](INVENTORY.md)), `GET /api/tracking/demo-locations` (public), `POST /api/tracking/deliveries`, `GET /api/tracking/deliveries/mine\|{trackingNumber}\|{trackingNumber}/history`, `POST /api/tracking/deliveries/{trackingNumber}/advance`, `GET /api/tracking/repair-requests/{id}/deliveries`, `GET /api/tracking/orders/{orderId}/deliveries` (simulated, parties only; see [DELIVERY_TRACKING.md](DELIVERY_TRACKING.md)) |
 
 Shared (all three, Phase 1): `GET /api/health` and `GET /actuator/health`.
 
@@ -73,6 +73,11 @@ commission research · cloud documentation, presentation, demo video.
    passport. order-service owns the order, fees, payments, commission, payouts, refunds and ledger. The
    confirmation call is the last step of order-service's payment transaction, and a failure rolls the payment back
    (see [PAYMENTS.md](PAYMENTS.md)).
+   **Delivery tracking (simulated):** repair-service → order-service `GET /api/internal/orders/{id}`
+   (`X-Internal-Api-Key`) only when a seller books a store-to-customer delivery, to check the seller and that the order
+   is paid. The two parties are copied onto the delivery, so reading tracking needs no further call. Positions come
+   from predefined Gujarat demo locations and a simulator, never from GPS or a courier (see
+   [DELIVERY_TRACKING.md](DELIVERY_TRACKING.md)).
 2. **Later phases:** synchronous **REST over HTTP** between services using only the
    agreed endpoint contracts above. The frontend calls the same REST APIs.
 3. **Database-per-service:** each service owns its schema. Services never read
@@ -126,6 +131,7 @@ Every service exposes:
 1. **Foundation** (three services, health endpoints, CI) ✔
 2. Accounts & marketplace ✔
 3. Repairer system ✔
-4. Orders & simulated payments ✔ ([PAYMENTS.md](PAYMENTS.md))
+4. Orders & simulated payments ✔ ([PAYMENTS.md](PAYMENTS.md)); simulated delivery tracking ✔
+   ([DELIVERY_TRACKING.md](DELIVERY_TRACKING.md))
 5. Frontend integration ← next
 6. Testing & deployment (30+ test cases, Docker, cloud)

@@ -31,6 +31,9 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  *   <li><b>Repair requests:</b> {@code /api/repair-requests/**} need a token; roles via {@code @PreAuthorize},
  *       participant checks (own request / assigned workshop) in the service.</li>
  *   <li><b>Internal:</b> {@code /api/internal/**} (order-service callbacks) check {@code X-Internal-Api-Key}.</li>
+ *   <li><b>Simulated delivery tracking:</b> {@code GET /api/tracking/demo-locations} and the static demo page
+ *       ({@code /tracking-demo.html}, {@code /tracking-demo/**}) are public; {@code /api/tracking/**} otherwise needs
+ *       a token (customer or repairer), with party checks in the service.</li>
  *   <li>Everything else needs a valid token. 401/403 are JSON.</li>
  * </ul>
  */
@@ -78,6 +81,12 @@ public class SecurityConfig {
                 .requestMatchers(
                     path.matcher(HttpMethod.GET, "/demo-images/**"),
                     path.matcher(HttpMethod.GET, "/api/repair-requests/demo-images")).permitAll()
+                // simulated delivery tracking: the demo location list and the static Leaflet demo page are public;
+                // every /api/tracking/deliveries/** call needs a token (party checks in DeliveryTrackingService)
+                .requestMatchers(
+                    path.matcher(HttpMethod.GET, "/api/tracking/demo-locations"),
+                    path.matcher(HttpMethod.GET, "/tracking-demo.html"),
+                    path.matcher(HttpMethod.GET, "/tracking-demo/**")).permitAll()
                 // repairer workshop profiles: reads are public, writes need a REPAIRER
                 .requestMatchers(path.matcher(HttpMethod.GET, "/api/repairers/me")).hasRole("REPAIRER")
                 .requestMatchers(

@@ -93,6 +93,40 @@ class HttpOrderServiceClientTest {
     }
 
     @Test
+    void getOrderReadsTheInternalOrderView() {
+        server.expect(requestTo(BASE + "/api/internal/orders/31"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Internal-Api-Key", "k3y"))
+                .andRespond(withSuccess("""
+                        {"id":31,"orderNumber":"ORD-20261125-ABCDEFGHJK","status":"CONFIRMED","buyerAccountId":501,
+                         "sellerAccountId":701,"productId":42,"productTitle":"Used Sony headphones",
+                         "paidAt":"2026-11-25T10:15:30","somethingNew":true}
+                        """, MediaType.APPLICATION_JSON));
+
+        MarketplaceOrderView order = client.getOrder(31L);
+
+        assertThat(order.orderNumber()).isEqualTo("ORD-20261125-ABCDEFGHJK");
+        assertThat(order.buyerAccountId()).isEqualTo(501L);
+        assertThat(order.sellerAccountId()).isEqualTo(701L);
+        assertThat(order.isConfirmed()).isTrue();
+        assertThat(order.paidAt()).isNotNull();
+        server.verify();
+    }
+
+    @Test
+    void unknownOrderIsNotFound() {
+        server.expect(requestTo(BASE + "/api/internal/orders/32"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"status\":404,\"message\":\"Order 32 not found\"}"));
+
+        assertThatThrownBy(() -> client.getOrder(32L))
+                .isInstanceOfSatisfying(OrderServiceException.class, ex -> {
+                    assertThat(ex.getStatus()).isEqualTo(404);
+                    assertThat(ex.getMessage()).isEqualTo("Order 32 not found");
+                });
+    }
+
+    @Test
     void unreachableIsServiceUnavailable() {
         HttpOrderServiceClient offline = new HttpOrderServiceClient("http://localhost:1", "k3y");
 

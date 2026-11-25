@@ -74,6 +74,34 @@ public class HttpOrderServiceClient implements OrderServiceClient {
         return post("/api/internal/repair-quotes/" + quoteId + "/reject", command, "reject the quote");
     }
 
+    @Override
+    public MarketplaceOrderView getOrder(Long orderId) {
+        String action = "read order " + orderId;
+        try {
+            MarketplaceOrderView view = restClient.get()
+                    .uri("/api/internal/orders/{id}", orderId)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(MarketplaceOrderView.class);
+            if (view == null || view.id() == null) {
+                throw new OrderServiceException(502, "Order service returned no order", null);
+            }
+            return view;
+        } catch (ResourceAccessException ex) {
+            throw new OrderServiceException(503, "Order & Payment service is unavailable, so ReLoop could not " + action
+                    + ". Start order-service (port 8082) and try again.", ex);
+        } catch (RestClientResponseException ex) {
+            if (ex.getStatusCode().value() == 404) {
+                throw new OrderServiceException(404, "Order " + orderId + " not found", ex);
+            }
+            log.warn("order-service refused to {}: {} {}", action, ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new OrderServiceException(502,
+                    "Order service could not " + action + " (HTTP " + ex.getStatusCode().value() + ")", ex);
+        } catch (RestClientException ex) {
+            throw new OrderServiceException(502, "Unexpected response from order service", ex);
+        }
+    }
+
     private QuoteView post(String path, Object body, String action) {
         try {
             QuoteView view = restClient.post()

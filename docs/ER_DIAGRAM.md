@@ -315,7 +315,8 @@ erDiagram
     REPAIR_REQUEST ||--o{ REPAIR_STATUS_HISTORY : timeline
     REPAIR_REQUEST ||--o{ REPAIR_REQUEST_IMAGE : photos
     REPAIR_REQUEST ||--o{ INVENTORY_MOVEMENT : "parts used"
-    REPAIR_REQUEST ||--o{ DELIVERY_TRACKING : shipments
+    REPAIR_REQUEST |o--o{ DELIVERY : "repair legs (simulated)"
+    DELIVERY ||--o{ DELIVERY_LOCATION_POINT : "coordinate history"
     SPARE_PART ||--o{ INVENTORY_MOVEMENT : movements
     REPAIRER_PROFILE ||--o{ INVENTORY_MOVEMENT : owns
 
@@ -463,21 +464,48 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    DELIVERY_TRACKING {
+    DELIVERY {
         bigint id PK
-        bigint repair_request_id FK "indexed with status"
-        string tracking_number "indexed"
-        string carrier
-        string status "CREATED..DELIVERED|FAILED"
-        string origin_location
-        string destination_location
-        double current_latitude
-        double current_longitude
-        string event_note
-        timestamp estimated_delivery_at
+        string tracking_number UK "TRK-SIM-yyyyMMdd-XXXXXXXX"
+        string delivery_type "STORE_TO_CUSTOMER|CUSTOMER_TO_REPAIRER|REPAIRER_TO_CUSTOMER"
+        bigint repair_request_id FK "nullable - repair legs; UK with type"
+        bigint order_external_id "ext order-service - no FK; UK with type"
+        string reference_number "RR-... or ORD-..."
+        bigint customer_account_id "ext - buyer or repair customer"
+        bigint partner_account_id "ext - seller or repairer"
+        bigint booked_by_account_id
+        string origin_code "demo location snapshot"
+        double origin_latitude
+        double origin_longitude
+        string destination_code "demo location snapshot"
+        double destination_latitude
+        double destination_longitude
+        double route_distance_km "straight line x road factor"
+        double current_latitude "simulated"
+        double current_longitude "simulated"
+        int simulation_step "0..7"
+        int progress_percent
+        string status "BOOKED|PICKED_UP|IN_TRANSIT|NEAR_DESTINATION|DELIVERED"
+        timestamp estimated_arrival_at
+        timestamp picked_up_at
         timestamp delivered_at
+        timestamp last_advanced_at
+        bigint version "optimistic lock"
         timestamp created_at
         timestamp updated_at
+    }
+    DELIVERY_LOCATION_POINT {
+        bigint id PK
+        bigint delivery_id FK "UK with sequence_no"
+        int sequence_no "0 = booking"
+        string status
+        double latitude "simulated"
+        double longitude "simulated"
+        int progress_percent
+        double remaining_km
+        string note
+        bigint recorded_by_account_id
+        timestamp recorded_at "append-only"
     }
 ```
 
@@ -499,6 +527,7 @@ flowchart LR
     subgraph RS["repair-service :8083"]
         RP["RepairerProfile"]
         RR["RepairRequest"]
+        DL["Delivery (simulated)"]
     end
     PO -- "buyer/seller_account_id (no FK)" --> ACC
     RQ -- "customer_account_id" --> ACC
@@ -514,4 +543,6 @@ flowchart LR
     RP -- "account_external_id" --> ACC
     RAI -- "repairer_profile_id (ext)" --> RP
     OS -. "OrderItem.product_external_id" .-> PRD
+    DL -- "order_external_id (GET /api/internal/orders/{id} at booking)" --> PO
+    DL -- "customer/partner_account_id" --> ACC
 ```
