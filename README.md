@@ -85,11 +85,14 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
 
 ## Project status
 
-**Phase 1 — Foundation (complete):** three runnable services, H2 databases, actuator
-health checks, 18 passing tests (6 per service).
+- **Foundation (complete):** three runnable services, H2 databases, actuator health checks.
+- **Data model (complete):** entities, constraints and indexes for all three services ([ER_DIAGRAM](docs/ER_DIAGRAM.md), [SCHEMA](docs/SCHEMA.md)).
+- **Accounts & auth (complete):** customer and repairer registration, login, JWT, role-based access, demo accounts ([AUTH](docs/AUTH.md)).
+- **Second-hand marketplace (complete):** list, edit, deactivate, browse, keyword search, filters,
+  product details, purchase rules, and a product passport with full history. Demo listings in
+  Ahmedabad, Surat, Vadodara, Rajkot and Gandhinagar ([MARKETPLACE](docs/MARKETPLACE.md)).
 
-Roadmap: Phase 2 accounts & marketplace → Phase 3 repairer system → Phase 4 orders &
-simulated payments → Phase 5 frontend integration → Phase 6 testing & deployment.
+Next: repairer system → orders & simulated payments → frontend integration → testing & deployment.
 
 ## Documentation
 
@@ -97,6 +100,7 @@ simulated payments → Phase 5 frontend integration → Phase 6 testing & deploy
 - [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md) — Mermaid ER diagrams for all three services
 - [docs/SCHEMA.md](docs/SCHEMA.md) — schema configuration, constraints, indexes, money conventions
 - [docs/AUTH.md](docs/AUTH.md) — registration, login, JWT + roles, **demo credentials**, how to test both account types
+- [docs/MARKETPLACE.md](docs/MARKETPLACE.md) — marketplace API, listing/purchase rules, product passport, demo products, curl walkthrough
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented in later phases)

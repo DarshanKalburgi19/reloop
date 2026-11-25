@@ -33,7 +33,7 @@ any business features are implemented.
 
 | Service | Port | Package | Database | Owner | Planned main endpoints (blueprint contract) |
 |---|---|---|---|---|---|
-| Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register/customer`, `POST /api/auth/register/repairer`, `POST /api/auth/login`, `GET /api/auth/me` (see [AUTH.md](AUTH.md)), `GET/POST /api/products`, `GET /api/products/{id}` |
+| Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register/customer`, `POST /api/auth/register/repairer`, `POST /api/auth/login`, `GET /api/auth/me` (see [AUTH.md](AUTH.md)), `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}`, `GET /api/products/{id}/passport`, `POST /api/products/{id}/purchase`, `GET /api/products/mine` (see [MARKETPLACE.md](MARKETPLACE.md)) |
 | Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/orders`, `POST /api/repairs/{id}/quote`, `POST /api/repairs/{id}/approve`, `POST /api/payments/simulate`, `GET /api/transactions/{id}` |
 | Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `GET /api/repairers`, `POST /api/repair-requests`, `GET/POST /api/repairers/{id}/inventory`, `PATCH /api/repair-requests/{id}/status` |
 

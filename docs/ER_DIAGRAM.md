@@ -17,6 +17,11 @@ erDiagram
     CITY ||--o{ STORE : located_in
     STORE ||--o{ PRODUCT : lists
     PRODUCT ||--o{ PRODUCT_IMAGE : has
+    ACCOUNT ||--o{ PRODUCT : buys
+    PRODUCT_PASSPORT ||--o{ PRODUCT : "one item, 1..n listings"
+    ACCOUNT ||--o{ PRODUCT_PASSPORT : "currently owns"
+    PRODUCT_PASSPORT ||--o{ PRODUCT_HISTORY_EVENT : "timeline (append-only)"
+    PRODUCT ||--o{ PRODUCT_HISTORY_EVENT : "event of"
 
     ACCOUNT {
         bigint id PK
@@ -83,9 +88,31 @@ erDiagram
         string description
         string category "enum ProductCategory - indexed"
         bigint price_paise "integer paise"
-        string status "enum DRAFT|ACTIVE|RESERVED|SOLD|ARCHIVED"
-        string location_city
+        string status "enum DRAFT|ACTIVE|RESERVED|SOLD|ARCHIVED - availability"
+        string item_condition "enum LIKE_NEW|VERY_GOOD|GOOD|FAIR|NEEDS_REPAIR"
+        string location_city "indexed"
+        string pickup_location "nullable"
+        bigint passport_id FK "NOT NULL, indexed"
+        bigint buyer_account_id FK "nullable - set when SOLD"
         timestamp sold_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    PRODUCT_PASSPORT {
+        bigint id PK
+        string passport_code UK "uk_passports_code - RLP-XXXX-XXXX-XXXX, immutable"
+        bigint current_owner_account_id FK "indexed - moves to buyer on purchase"
+        timestamp created_at
+        timestamp updated_at
+    }
+    PRODUCT_HISTORY_EVENT {
+        bigint id PK
+        bigint passport_id FK "indexed with created_at"
+        bigint product_id FK "indexed"
+        string event_type "LISTED|RELISTED|UPDATED|PRICE_CHANGED|DEACTIVATED|REACTIVATED|SOLD"
+        bigint actor_account_id FK "nullable"
+        bigint price_paise "price at the time of the event"
+        string details
         timestamp created_at
         timestamp updated_at
     }

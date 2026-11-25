@@ -111,6 +111,8 @@ Other behaviour:
 | Role | Email | Password | Details |
 |---|---|---|---|
 | CUSTOMER | `customer.demo@reloop.local` | `ReLoopDemo#Cust2026` | Asha Patel, Navrangpura, Ahmedabad 380009 |
+| CUSTOMER | `karan.demo@reloop.local` | `ReLoopDemo#Karan2026` | Karan Desai, Surat 395007 — owns the demo store "Karan's Pre-Loved Electronics" |
+| CUSTOMER | `nisha.demo@reloop.local` | `ReLoopDemo#Nisha2026` | Nisha Trivedi, Vadodara 390007 |
 | REPAIRER | `repairer.demo@reloop.local` | `ReLoopDemo#Rep2026` | Ravi Mehta, "Mehta Fix-It Workshop", CG Road, Ahmedabad (23.0225, 72.5714), all 3 repair methods, `UNVERIFIED` |
 
 - Seeding is idempotent: accounts that already exist are skipped on restart.
@@ -131,7 +133,7 @@ Other behaviour:
 | `reloop.security.bcrypt-strength` | `12` | tests use `4` for speed |
 | `reloop.services.repair.base-url` | `http://localhost:8083` | product-service → repair-service |
 | `reloop.internal.api-key` (`RELOOP_INTERNAL_API_KEY`) | dev-only value | must be the **same** in product-service and repair-service |
-| `reloop.seed.enabled` | `false` (main props: `true`) | demo accounts |
+| `reloop.seed.enabled` | `false` (main props: `true`) | demo accounts and demo products ([MARKETPLACE.md](MARKETPLACE.md)) |
 
 ## 5. How to test both account types
 

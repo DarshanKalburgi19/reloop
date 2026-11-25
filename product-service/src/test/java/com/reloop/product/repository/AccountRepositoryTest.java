@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.reloop.product.entity.Account;
 import com.reloop.product.entity.Product;
+import com.reloop.product.entity.ProductPassport;
 import com.reloop.product.enums.AccountRole;
 import com.reloop.product.enums.ProductCategory;
+import com.reloop.product.enums.ProductCondition;
 import com.reloop.product.enums.ProductStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,9 @@ class AccountRepositoryTest {
 
     @Autowired
     private ProductRepository products;
+
+    @Autowired
+    private ProductPassportRepository passports;
 
     @Test
     void accountRoundTripFillsTimestampsAndFindsByEmail() {
@@ -63,6 +68,8 @@ class AccountRepositoryTest {
         product.setCategory(ProductCategory.ELECTRONICS);
         product.setPricePaise(3299900L); // ₹32,999.00 stored as paise
         product.setStatus(ProductStatus.ACTIVE);
+        product.setCondition(ProductCondition.VERY_GOOD);
+        product.setPassport(passports.saveAndFlush(new ProductPassport("RLP-TEST-0000-0001", seller)));
 
         Product saved = products.saveAndFlush(product);
         assertNotNull(saved.getId());
@@ -71,5 +78,14 @@ class AccountRepositoryTest {
         assertEquals(1, products.findByStatus(ProductStatus.ACTIVE).size());
         assertEquals(1, products.findByTitleContainingIgnoreCase("iphone").size());
         assertEquals(1, products.findBySeller_Id(seller.getId()).size());
+    }
+
+    @Test
+    void passportCodeIsUnique() {
+        Account owner = accounts.saveAndFlush(new Account("owner@reloop.test", "hash", AccountRole.CUSTOMER));
+        passports.saveAndFlush(new ProductPassport("RLP-TEST-0000-0002", owner));
+
+        assertThrows(DataIntegrityViolationException.class, () ->
+                passports.saveAndFlush(new ProductPassport("RLP-TEST-0000-0002", owner)));
     }
 }

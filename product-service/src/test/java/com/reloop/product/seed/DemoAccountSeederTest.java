@@ -22,6 +22,14 @@ class DemoAccountSeederTest {
     private final DemoAccountSeeder seeder = new DemoAccountSeeder(authService, 1, 1);
 
     @Test
+    void demoListingsCoverAllFiveCitiesAndHaveDistinctTitles() {
+        assertThat(DemoProductSeeder.LISTINGS).extracting(DemoProductSeeder.DemoListing::city)
+                .contains("Ahmedabad", "Surat", "Vadodara", "Rajkot", "Gandhinagar");
+        assertThat(DemoProductSeeder.LISTINGS).extracting(DemoProductSeeder.DemoListing::title).doesNotHaveDuplicates();
+        assertThat(DemoAccounts.customers()).extracting(CustomerRegistrationRequest::email).doesNotHaveDuplicates();
+    }
+
+    @Test
     void existingAccountsAreNotRecreated() {
         when(authService.emailExists(any())).thenReturn(true);
 
@@ -49,6 +57,12 @@ class DemoAccountSeederTest {
             RepairerRegistrationRequest repairer = DemoAccounts.repairer();
             assertThat(validator.validate(customer)).isEmpty();
             assertThat(validator.validate(repairer)).isEmpty();
+            for (CustomerRegistrationRequest c : DemoAccounts.customers()) {
+                assertThat(validator.validate(c)).as(c.email()).isEmpty();
+            }
+            for (DemoProductSeeder.DemoListing listing : DemoProductSeeder.LISTINGS) {
+                assertThat(validator.validate(DemoProductSeeder.toCreate(listing, null))).as(listing.title()).isEmpty();
+            }
         }
     }
 }

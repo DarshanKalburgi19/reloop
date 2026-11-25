@@ -29,7 +29,9 @@ Java `pricePaise` → column `price_paise`.
 | `cities` | `name`/`state` NOT NULL | `ix_cities_name`, `ix_cities_state` |
 | `addresses` | FK → `accounts`, `cities`; `status` NOT NULL | `ix_addresses_account`, `ix_addresses_city`, `ix_addresses_pincode` |
 | `stores` | FK → `accounts`, `cities`; `status` NOT NULL | `ix_stores_owner`, `ix_stores_city`, `ix_stores_name` |
-| `products` | FK → `accounts`, `stores`; `price_paise` NOT NULL (Long) | `ix_products_seller_status`, `ix_products_title`, `ix_products_category`, `ix_products_store` |
+| `products` | FK → `accounts` (seller, buyer), `stores`, `product_passports`; `price_paise`, `item_condition`, `passport_id` NOT NULL | `ix_products_seller_status`, `ix_products_title`, `ix_products_category`, `ix_products_store`, `ix_products_status_created(status, created_at)`, `ix_products_city`, `ix_products_price`, `ix_products_passport` |
+| `product_passports` | **UNIQUE** `passport_code` (`uk_passports_code`, immutable); FK → `accounts` (current owner) | `ix_passports_owner` |
+| `product_history_events` | FK → `product_passports`, `products`, `accounts` (actor); every column `updatable = false` (append-only) | `ix_history_passport_created(passport_id, created_at)`, `ix_history_product` |
 | `product_images` | FK → `products` (cascade delete via orphanRemoval) | `ix_product_images_product(product_id, sort_order)` |
 
 ### order-service (`reloop_order`)

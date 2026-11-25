@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" role="img" aria-label="ReLoop placeholder image: Electronics">
+  <title>ReLoop placeholder - Electronics</title>
+  <rect width="640" height="480" fill="#dbeafe"/>
+  <rect x="16" y="16" width="608" height="448" rx="24" fill="none" stroke="#1f6feb" stroke-width="4" stroke-dasharray="14 10" opacity="0.5"/>
+  <path d="M260 150h120a10 10 0 0 1 10 10v80a10 10 0 0 1-10 10H260a10 10 0 0 1-10-10v-80a10 10 0 0 1 10-10zm-20 110h160l12 20H228z" fill="#1f6feb" fill-rule="evenodd" stroke="#1f6feb" stroke-width="2" opacity="0.85"/>
+  <text x="320" y="352" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#1f6feb">Electronics</text>
+  <text x="320" y="392" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#1f6feb" opacity="0.8">ReLoop demo image - no photo uploaded</text>
+</svg>

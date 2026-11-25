@@ -1,5 +1,6 @@
 package com.reloop.product.seed;
 
+import com.reloop.product.dto.auth.CustomerRegistrationRequest;
 import com.reloop.product.exception.RepairServiceException;
 import com.reloop.product.service.AuthService;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  */
 @Component
+@Order(1)
 @ConditionalOnProperty(name = "reloop.seed.enabled", havingValue = "true")
 public class DemoAccountSeeder implements ApplicationRunner {
 
@@ -54,12 +57,14 @@ public class DemoAccountSeeder implements ApplicationRunner {
     }
 
     void seedCustomer() {
-        if (authService.emailExists(DemoAccounts.CUSTOMER_EMAIL)) {
-            log.info("Demo customer already present: {}", DemoAccounts.CUSTOMER_EMAIL);
-            return;
+        for (CustomerRegistrationRequest customer : DemoAccounts.customers()) {
+            if (authService.emailExists(customer.email())) {
+                log.info("Demo customer already present: {}", customer.email());
+                continue;
+            }
+            authService.registerCustomer(customer);
+            log.warn("Seeded TEMPORARY demo CUSTOMER {} (password in docs/AUTH.md)", customer.email());
         }
-        authService.registerCustomer(DemoAccounts.customer());
-        log.warn("Seeded TEMPORARY demo CUSTOMER {} (password in docs/AUTH.md)", DemoAccounts.CUSTOMER_EMAIL);
     }
 
     /** @return true when the repairer exists afterwards */
