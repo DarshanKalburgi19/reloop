@@ -1,4 +1,4 @@
-package reloop.product.enums;
+package com.reloop.product.enums;
 
 /**
  * ProductCategory - fixed status/choice enum (stored as string, never ordinal).

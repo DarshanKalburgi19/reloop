@@ -1,4 +1,4 @@
-package reloop.repair.enums;
+package com.reloop.repair.enums;
 
 /**
  * InventoryMovementType - fixed status/choice enum (stored as string, never ordinal).

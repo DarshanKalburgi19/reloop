@@ -1,4 +1,4 @@
-package reloop.orderpayment.enums;
+package com.reloop.orderpayment.enums;
 
 /**
  * PaymentMethod - fixed status/choice enum (stored as string, never ordinal).
