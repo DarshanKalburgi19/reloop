@@ -1,4 +1,4 @@
-package com.reloop.order.health;
+package com.reloop.orderpayment.health;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;

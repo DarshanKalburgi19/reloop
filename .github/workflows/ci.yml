@@ -6,6 +6,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  statuses: write
+
 jobs:
   build-and-test:
     name: Build & test ${{ matrix.service }}
@@ -26,6 +30,7 @@ jobs:
           cache: maven
 
       - name: Build and run tests
+        id: build
         run: mvn -B -ntp -f ${{ matrix.service }}/pom.xml verify
 
       - name: Publish test summary
@@ -43,3 +48,22 @@ jobs:
             fi
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report test totals as commit status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            STATE=success
+          else
+            STATE=failure
+          fi
+          REPORT=$(grep -h "Tests run:" ${{ matrix.service }}/target/surefire-reports/*.txt 2>/dev/null \
+            | awk -F'[:,]' '{t+=$2; f+=$4; e+=$6; s+=$8} END {if (t+f+e > 0) printf "Tests run: %d, Failures: %d, Errors: %d, Skipped: %d", t, f, e, s}')
+          [ -n "$REPORT" ] || REPORT="Build ${{ steps.build.outcome }} (no test report)"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state="$STATE" \
+            -f description="$REPORT" \
+            -f context="tests/${{ matrix.service }}" \
+            --jq '.context + " -> " + .state + ": " + .description' || true

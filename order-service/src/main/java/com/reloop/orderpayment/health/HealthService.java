@@ -1,4 +1,4 @@
-package com.reloop.order.health;
+package com.reloop.orderpayment.health;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,7 +17,7 @@ public class HealthService {
     private final String serviceName;
 
     /**
-     * @param serviceName injected from {@code spring.application.name} in application.yml
+     * @param serviceName injected from {@code spring.application.name} in application.properties
      */
     public HealthService(@Value("${spring.application.name}") String serviceName) {
         this.serviceName = serviceName;

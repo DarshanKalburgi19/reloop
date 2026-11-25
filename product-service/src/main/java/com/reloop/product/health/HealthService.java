@@ -17,7 +17,7 @@ public class HealthService {
     private final String serviceName;
 
     /**
-     * @param serviceName injected from {@code spring.application.name} in application.yml
+     * @param serviceName injected from {@code spring.application.name} in application.properties
      */
     public HealthService(@Value("${spring.application.name}") String serviceName) {
         this.serviceName = serviceName;
