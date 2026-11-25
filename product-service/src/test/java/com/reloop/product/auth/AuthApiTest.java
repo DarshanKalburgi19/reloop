@@ -14,6 +14,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -221,8 +222,9 @@ class AuthApiTest {
 
     @Test
     void repairerRegistrationRollsBackWhenRepairServiceIsDown() throws Exception {
-        when(repairerProfileClient.createProfile(any()))
-                .thenThrow(new RepairServiceException(503, "Repair service is unavailable", null));
+        // doThrow (not when(...)) so the @BeforeEach answer is not invoked while re-stubbing
+        doThrow(new RepairServiceException(503, "Repair service is unavailable", null))
+                .when(repairerProfileClient).createProfile(any());
         String email = uniqueEmail("down");
 
         mvc.perform(post("/api/auth/register/repairer").contentType(MediaType.APPLICATION_JSON)
