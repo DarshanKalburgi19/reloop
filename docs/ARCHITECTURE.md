@@ -33,9 +33,9 @@ any business features are implemented.
 
 | Service | Port | Package | Database | Owner | Planned main endpoints (blueprint contract) |
 |---|---|---|---|---|---|
-| Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register`, `POST /api/auth/login`, `GET/POST /api/products`, `GET /api/products/{id}` |
+| Product & Account | 8081 | `com.reloop.product` | H2 `reloop_product` | **PC1** | `POST /api/auth/register/customer`, `POST /api/auth/register/repairer`, `POST /api/auth/login`, `GET /api/auth/me` (see [AUTH.md](AUTH.md)), `GET/POST /api/products`, `GET /api/products/{id}` |
 | Order & Payment | 8082 | `com.reloop.orderpayment` | H2 `reloop_order` | **PC2** | `POST /api/orders`, `POST /api/repairs/{id}/quote`, `POST /api/repairs/{id}/approve`, `POST /api/payments/simulate`, `GET /api/transactions/{id}` |
-| Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `GET /api/repairers`, `POST /api/repairers`, `POST /api/repair-requests`, `GET/POST /api/repairers/{id}/inventory`, `PATCH /api/repair-requests/{id}/status` |
+| Repair & Tracking | 8083 | `com.reloop.repair` | H2 `reloop_repair` | **PC3** | `POST /api/repairer-profiles` (internal), `GET /api/repairer-profiles/{id}`, `GET /api/repairers`, `POST /api/repair-requests`, `GET/POST /api/repairers/{id}/inventory`, `PATCH /api/repair-requests/{id}/status` |
 
 Shared (all three, Phase 1): `GET /api/health` and `GET /actuator/health`.
 
@@ -57,6 +57,9 @@ commission research · cloud documentation, presentation, demo video.
 
 1. **Phase 1:** no cross-service calls yet — services are independent so each
    developer can work without blocking the others.
+   **Phase 3 (auth):** first call — product-service → repair-service
+   `POST /api/repairer-profiles` during repairer registration, authenticated with the shared
+   `X-Internal-Api-Key` header (see [AUTH.md](AUTH.md)).
 2. **Later phases:** synchronous **REST over HTTP** between services using only the
    agreed endpoint contracts above. The frontend calls the same REST APIs.
 3. **Database-per-service:** each service owns its schema. Services never read
