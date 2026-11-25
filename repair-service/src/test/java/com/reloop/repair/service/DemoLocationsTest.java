@@ -19,7 +19,7 @@ class DemoLocationsTest {
             // Gujarat's bounding box (approx.)
             assertThat(l.latitude()).isBetween(20.0, 24.8);
             assertThat(l.longitude()).isBetween(68.0, 74.6);
-            assertThat(l.code()).matches("[A-Z_]+");
+            assertThat(l.code()).matches("[A-Z][A-Z0-9_]+");
             assertThat(l.label()).isNotBlank();
             assertThat(l.city()).isNotBlank();
         });
