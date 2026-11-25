@@ -29,7 +29,7 @@ import jakarta.persistence.UniqueConstraint;
 )
 @org.hibernate.annotations.Check(
     name = "ck_parts_stock_nonnegative",
-    constraint = "stock_quantity >= 0"
+    constraints = "stock_quantity >= 0"
 )
 public class SparePart extends BaseEntity {
 

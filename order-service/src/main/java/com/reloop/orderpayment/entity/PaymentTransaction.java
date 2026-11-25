@@ -35,7 +35,7 @@ import java.time.LocalDateTime;
 )
 @org.hibernate.annotations.Check(
     name = "ck_payments_exactly_one_ref",
-    constraint = "(purchase_order_id IS NULL <> repair_quote_id IS NULL)"
+    constraints = "(purchase_order_id IS NULL <> repair_quote_id IS NULL)"
 )
 public class PaymentTransaction extends BaseEntity {
 
