@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [ product-service, order-service, repair-service ]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build and run tests
+        run: mvn -B -ntp -f ${{ matrix.service }}/pom.xml verify
+
+      - name: Publish test summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ matrix.service }}"
+            echo '```'
+            if ls ${{ matrix.service }}/target/surefire-reports/*.txt >/dev/null 2>&1; then
+              grep -H "Tests run:" ${{ matrix.service }}/target/surefire-reports/*.txt
+              grep -h "Tests run:" ${{ matrix.service }}/target/surefire-reports/*.txt \
+                | awk -F'[:,]' '{t+=$2; f+=$4; e+=$6; s+=$8} END {printf "TOTAL: Tests run: %d, Failures: %d, Errors: %d, Skipped: %d\n", t, f, e, s}'
+            else
+              echo "No surefire reports found."
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
