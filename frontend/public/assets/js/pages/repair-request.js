@@ -81,6 +81,7 @@ RL.page(async ({ role }) => {
     document.title = req.requestNumber + ' — ReLoop';
     await loadLegs();
     render();
+    live.mark(req);
   }
   async function loadLegs() {
     try {

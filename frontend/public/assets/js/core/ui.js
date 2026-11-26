@@ -204,7 +204,7 @@
         const data = await fetcher();
         failures = 0; delay = o.interval;
         const fp = fingerprint(data);
-        if (fp === null || fp !== last) { last = fp; apply(data); }
+        if (fp === null || fp !== last) { last = fp; await apply(data); }
         indicator('ok');
       } catch (err) {
         if (err && (err.status === 401 || err.status === 403)) { stop(); indicator('stopped'); return; }
