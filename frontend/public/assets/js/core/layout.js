@@ -254,7 +254,7 @@
         RL.ui.toastError(err, 'This page failed to load');
       }
     };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
     else run();
   };
 
