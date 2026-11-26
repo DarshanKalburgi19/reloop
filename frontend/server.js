@@ -174,7 +174,7 @@ function serveStatic(req, res, url) {
       'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'same-origin',
-      ...(ext === '.html' ? { 'Content-Security-Policy': CSP } : {}),
+      ...(ext === '.html' ? { 'Content-Security-Policy': CSP, 'Permissions-Policy': 'geolocation=(self), camera=(), microphone=(), payment=()' } : {}),
     });
     if (req.method === 'HEAD') { res.end(); return; }
     fs.createReadStream(file).pipe(res);

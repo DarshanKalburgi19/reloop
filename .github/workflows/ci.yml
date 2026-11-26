@@ -81,3 +81,36 @@ jobs:
             -f description="$REPORT" \
             -f context="tests/${{ matrix.service }}" \
             --jq '.context + " -> " + .state + ": " + .description' || true
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Static checks (syntax, links, CSP, SRI, proxy routes)
+        working-directory: frontend
+        run: npm test
+
+      - name: Dev server smoke test (mock backend)
+        working-directory: frontend
+        run: |
+          PORT=8080 node server.js --mock > server.log 2>&1 &
+          for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz >/dev/null && break; sleep 0.5; done
+          set -e
+          curl -fs http://localhost:8080/healthz
+          for p in / /marketplace.html /repairers.html /login.html /customer/ /repairer/ /assets/css/reloop.css /assets/js/core/api.js; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$p"); echo "$p -> $code"; [ "$code" = 200 ]
+          done
+          curl -fs http://localhost:8080/api/fee-rates | grep -q REPAIR_BOOKING
+          TOKEN=$(curl -fs -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"customer.demo@reloop.local","password":"ReLoopDemo#Cust2026"}' | node -pe 'JSON.parse(require("fs").readFileSync(0)).accessToken')
+          curl -fs http://localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep -q CUSTOMER
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/internal/orders/1); echo "internal -> $code"; [ "$code" = 404 ]
+          curl -sI http://localhost:8080/ | grep -qi "content-security-policy"

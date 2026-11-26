@@ -4,7 +4,7 @@
 products and book repairs from independent repair professionals.
 
 This repository is a **monorepo** containing three independently runnable Spring Boot
-microservices plus (later) the shared frontend.
+microservices plus the shared web frontend (`frontend/`, see [docs/FRONTEND.md](docs/FRONTEND.md)).
 
 ## Services
 
@@ -124,7 +124,16 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   `http://localhost:8083/tracking-demo.html`. No GPS or courier integration, and every response says so
   ([DELIVERY_TRACKING](docs/DELIVERY_TRACKING.md)).
 
-Next: reviews → frontend integration → testing & deployment.
+- **Web frontend (complete):** static HTML, CSS, Bootstrap 5 and vanilla JS in `frontend/`, served by a
+  dependency-free Node dev server that proxies `/api/**` to the three services (`cd frontend && npm start` →
+  http://localhost:8080). It has a homepage, marketplace, product pages, checkout with the full fee breakdown,
+  a Leaflet map for finding repairers, workshop pages with repair requests, login and both registrations. The
+  customer dashboard covers buying, selling, listings, purchases, sales, repairs, payments, tracking and profile.
+  The repairer dashboard covers overview with a profile-completion prompt, jobs, services, inventory, location,
+  earnings, payments and profile. `npm run start:mock` runs it against an in-memory mock for UI work without Java
+  ([FRONTEND](docs/FRONTEND.md)).
+
+Next: reviews → testing & deployment.
 
 ## Documentation
 
@@ -138,6 +147,7 @@ Next: reviews → frontend integration → testing & deployment.
 - [docs/INVENTORY.md](docs/INVENTORY.md) — repairer spare-parts inventory: model, stock rules, low-stock alerts, valuation, API, curl walkthrough, tests
 - [docs/PAYMENTS.md](docs/PAYMENTS.md) — orders, fees and commission, simulated payments, refunds and ledger, receipts, dashboards, API, curl walkthrough, tests
 - [docs/DELIVERY_TRACKING.md](docs/DELIVERY_TRACKING.md) — simulated delivery tracking: three legs, statuses, demo locations, ETA, history, access rules, API, Leaflet/OSM frontend integration, curl walkthrough, tests
+- [docs/FRONTEND.md](docs/FRONTEND.md) — web frontend: how to run it (real services or mock), page map, profile-completion prompt, modules, fee display, security notes
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented; see docs/PAYMENTS.md)
