@@ -44,6 +44,7 @@ were found and fixed in the services:
 | G4 | Neither dashboard could tell a "never paid" request apart from a "payment failed" one. | `paymentStatus` (`PAID`, `FAILED`, `CANCELLED`, `PARTIALLY_REFUNDED`, `REFUNDED`), `lastPaymentFailure` and `refundedAmountPaise` are on repair requests. Orders already carry `lastPaymentFailure`. Provider payout lists deliberately contain only successful payments, so a failed payment never creates a payout row. |
 | G5 | A **refund could be applied twice** on a double click or a client retry. | The refund endpoints accept `Idempotency-Key` (≤ 100 chars, unique per payment). A repeat returns the same result with `Idempotent-Replay: true`. The frontend refund dialog sends one key per dialog. |
 | G6 | Contracts were only checked by unit tests on each side, so the two sides could drift apart. | Shared example payloads in [`contracts/`](../contracts) are asserted by a `ServiceContractTest` in **every** service (see §2). |
+| G7 | Found by the real-stack e2e job: on a **fresh database** product-service crashed at startup. The demo seeder still used the legacy one-step purchase, which production disables because sales go through order-service. The test config turned it back on, so unit tests never noticed. | The seeder sells the demo item through the same reserve → confirm-sale path as order-service. The seeder test now runs with the production setting. |
 
 ## 2. Contract table
 

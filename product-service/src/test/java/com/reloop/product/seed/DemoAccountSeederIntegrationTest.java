@@ -13,6 +13,7 @@ import com.reloop.product.client.RepairerProfileView;
 import com.jayway.jsonpath.JsonPath;
 import com.reloop.product.entity.Account;
 import com.reloop.product.entity.Product;
+import com.reloop.product.enums.ProductStatus;
 import com.reloop.product.enums.AccountRole;
 import com.reloop.product.repository.AccountRepository;
 import com.reloop.product.repository.ProductRepository;
@@ -37,6 +38,8 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @SpringBootTest(properties = {
         "reloop.seed.enabled=true",
+        // production setting (test resources enable it for the legacy-purchase tests): seeding must not need it
+        "reloop.marketplace.direct-purchase-enabled=false",
         // own in-memory DB: committed demo rows must not leak into other test classes
         "spring.datasource.url=jdbc:h2:mem:product-seed-test;DB_CLOSE_DELAY=-1"})
 @AutoConfigureMockMvc
@@ -142,7 +145,8 @@ class DemoAccountSeederIntegrationTest {
                 .andExpect(jsonPath("$.ownershipTransfers").value(1))
                 .andReturn().getResponse().getContentAsString();
         List<String> events = JsonPath.read(json, "$.history[*].eventType");
-        assertThat(events).containsExactly("LISTED", "PRICE_CHANGED", "SOLD");
+        // seeded through the real reserve → confirm-sale path, exactly like an order-service sale
+        assertThat(events).containsExactly("LISTED", "PRICE_CHANGED", "RESERVED", "SOLD");
 
         // a sold item can't be bought again, even by a third demo customer
         String sellerLogin = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
@@ -151,7 +155,9 @@ class DemoAccountSeederIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         String token = JsonPath.read(sellerLogin, "$.accessToken");
         mvc.perform(post("/api/products/" + sold.getId() + "/purchase").header("Authorization", "Bearer " + token))
-                .andExpect(status().isConflict());
+                .andExpect(status().isGone());   // legacy direct purchase is off, as in production
+        assertThat(sold.getStatus()).isEqualTo(ProductStatus.SOLD);
+        assertThat(sold.getReservationReference()).isEqualTo(DemoProductSeeder.DEMO_SALE_REFERENCE);
     }
 
     @Test
