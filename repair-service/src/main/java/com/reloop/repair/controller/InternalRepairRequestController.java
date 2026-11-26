@@ -1,6 +1,7 @@
 package com.reloop.repair.controller;
 
 import com.reloop.repair.dto.repairrequest.PaymentConfirmationRequest;
+import com.reloop.repair.dto.repairrequest.PaymentEventRequest;
 import com.reloop.repair.dto.repairrequest.RepairRequestResponse;
 import com.reloop.repair.security.InternalApiKeyGuard;
 import com.reloop.repair.service.RepairRequestService;
@@ -21,7 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <pre>
  * POST /api/internal/repair-requests/{id}/payment-confirmation   order-service -> repair-service after payment
- *      200: request is PAID (repeat deliveries are no-ops)   409: not awaiting payment / stale quote / wrong amount
+ *      200: request is PAID (repeats for the same quote are no-ops / adopt the newer TXN reference)
+ *      409: not awaiting payment / stale quote / wrong amount
+ * POST /api/internal/repair-requests/{id}/payment-events         order-service -> repair-service: FAILED / CANCELLED
+ *      attempts and PARTIALLY_REFUNDED / REFUNDED refunds. Idempotent per eventId.
+ *      200: recorded (or duplicate)   409: refund for a payment this request wasn't paid with
  * </pre>
  */
 @RestController
@@ -48,5 +53,17 @@ public class InternalRepairRequestController {
             throw new ConstraintViolationException(violations);
         }
         return service.confirmPayment(id, body);
+    }
+
+    @PostMapping(path = "/{id:\\d+}/payment-events", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public RepairRequestResponse paymentEvent(@RequestHeader(name = InternalApiKeyGuard.HEADER, required = false) String key,
+                                              @PathVariable Long id,
+                                              @RequestBody PaymentEventRequest body) {
+        guard.verify(key);
+        Set<ConstraintViolation<PaymentEventRequest>> violations = validator.validate(body);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        return service.recordPaymentEvent(id, body);
     }
 }

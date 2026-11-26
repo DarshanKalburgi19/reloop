@@ -18,4 +18,6 @@ public interface RefundRecordRepository extends JpaRepository<RefundRecord, Long
     Optional<RefundRecord> findByRefundReference(String refundReference);
 
     List<RefundRecord> findByStatus(RefundStatus status);
+
+    Optional<RefundRecord> findByPaymentTransactionIdAndIdempotencyKey(Long paymentTransactionId, String idempotencyKey);
 }

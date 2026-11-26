@@ -1,6 +1,7 @@
 package com.reloop.product.service;
 
 import com.reloop.product.dto.sale.ProductReservationRequest;
+import com.reloop.product.dto.sale.ProductSaleRefundRequest;
 import com.reloop.product.dto.sale.ProductSaleResponse;
 import com.reloop.product.entity.Account;
 import com.reloop.product.entity.Product;
@@ -29,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
  * reserve       ACTIVE → RESERVED (held for the order; hidden from browse, frozen for the seller)
  * confirm-sale  RESERVED by this order → SOLD; buyer set, passport ownership moves to the buyer, SOLD history event
  * release       RESERVED by this order → ACTIVE (order cancelled / expired); no-op in any other state
+ * sale-refund   SOLD by this order → stays SOLD; a SALE_REFUNDED passport event records the refund (once per refund
+ *               reference). Ownership is not moved back: returning goods is handled outside the platform.
  * </pre>
  * Errors: 404 unknown product, 403 buyer is the seller, 409 not available / reserved by another order.
  */
@@ -110,6 +113,26 @@ public class ProductSaleService {
         String why = req.reason() == null || req.reason().isBlank() ? "" : ": " + req.reason().strip();
         record(product, ProductHistoryEventType.RESERVATION_RELEASED, null,
                 "Reservation by order " + req.orderReference() + " released" + why);
+        return response(product);
+    }
+
+    @Transactional
+    public ProductSaleResponse recordRefund(Long productId, ProductSaleRefundRequest req) {
+        Product product = products.findByIdForUpdate(productId).orElseThrow(() -> new ProductNotFoundException(productId));
+        if (product.getStatus() != ProductStatus.SOLD || !req.orderReference().equals(product.getReservationReference())) {
+            throw new ListingStateException("Product " + productId + " was not sold through order " + req.orderReference()
+                    + " (availability: " + product.getStatus() + "), so the refund can't be recorded on it");
+        }
+        String marker = "refund " + req.refundReference();
+        boolean seen = history.findByProduct_IdAndEventType(productId, ProductHistoryEventType.SALE_REFUNDED).stream()
+                .anyMatch(e -> e.getDetails() != null && e.getDetails().contains(marker + " "));
+        if (seen) {
+            return response(product);   // duplicate delivery of the same refund
+        }
+        String scope = req.fullyRefunded() ? "Sale fully refunded" : "Sale partly refunded";
+        record(product, ProductHistoryEventType.SALE_REFUNDED, null, scope + ": " + marker + " (" + Money.format(req.refundAmountPaise())
+                + ", " + Money.format(req.totalRefundedPaise()) + " refunded in total) on transaction " + req.transactionId()
+                + " of order " + req.orderReference() + (req.reason() == null || req.reason().isBlank() ? "" : ", reason " + req.reason().strip()));
         return response(product);
     }
 

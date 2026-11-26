@@ -20,7 +20,10 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
     name = "refund_records",
-    uniqueConstraints = @UniqueConstraint(name = "uk_refund_reference", columnNames = "refund_reference"),
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_refund_reference", columnNames = "refund_reference"),
+        @UniqueConstraint(name = "uk_refund_idempotency", columnNames = {"payment_transaction_id", "idempotency_key"})
+    },
     indexes = {
         @Index(name = "ix_refunds_payment", columnList = "payment_transaction_id"),
         @Index(name = "ix_refunds_status", columnList = "status")
@@ -89,6 +92,10 @@ public class RefundRecord extends BaseEntity {
 
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
+
+    /** Client-supplied Idempotency-Key (unique per payment); null when the caller sent none. */
+    @Column(name = "idempotency_key", length = 100, updatable = false)
+    private String idempotencyKey;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
@@ -230,5 +237,13 @@ public class RefundRecord extends BaseEntity {
 
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 }

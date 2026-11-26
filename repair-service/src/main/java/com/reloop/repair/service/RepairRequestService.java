@@ -8,16 +8,20 @@ import com.reloop.repair.dto.repairer.PageResponse;
 import com.reloop.repair.dto.repairrequest.CreateRepairRequest;
 import com.reloop.repair.dto.repairrequest.HistoryEntryResponse;
 import com.reloop.repair.dto.repairrequest.PaymentConfirmationRequest;
+import com.reloop.repair.dto.repairrequest.PaymentEventRequest;
 import com.reloop.repair.dto.repairrequest.QuoteRequest;
 import com.reloop.repair.dto.repairrequest.RepairRequestResponse;
 import com.reloop.repair.dto.repairrequest.RepairRequestSummaryResponse;
 import com.reloop.repair.dto.repairrequest.StatusUpdateRequest;
 import com.reloop.repair.entity.QuoteSnapshot;
+import com.reloop.repair.entity.RepairPaymentEvent;
 import com.reloop.repair.entity.RepairRequest;
 import com.reloop.repair.entity.RepairService;
 import com.reloop.repair.entity.RepairStatusHistory;
 import com.reloop.repair.entity.RepairerProfile;
 import com.reloop.repair.enums.AvailabilityStatus;
+import com.reloop.repair.enums.PaymentEventType;
+import com.reloop.repair.enums.RepairPaymentStatus;
 import com.reloop.repair.enums.RepairServiceStatus;
 import com.reloop.repair.enums.RepairStatus;
 import com.reloop.repair.enums.RepairerProfileStatus;
@@ -28,6 +32,7 @@ import com.reloop.repair.exception.RepairRequestNotFoundException;
 import com.reloop.repair.exception.RepairStateException;
 import com.reloop.repair.exception.RepairerUnavailableException;
 import com.reloop.repair.exception.RequestValidationException;
+import com.reloop.repair.repository.RepairPaymentEventRepository;
 import com.reloop.repair.repository.RepairRequestRepository;
 import com.reloop.repair.repository.RepairStatusHistoryRepository;
 import com.reloop.repair.repository.RepairerProfileRepository;
@@ -69,10 +74,12 @@ public class RepairRequestService {
     private final RepairerProfileRepository profiles;
     private final OrderServiceClient orderService;
     private final RequestNumberGenerator numbers;
+    private final RepairPaymentEventRepository paymentEvents;
 
     public RepairRequestService(RepairRequestRepository requests, RepairStatusHistoryRepository history,
                                 RepairerProfileRepository profiles, OrderServiceClient orderService,
-                                RequestNumberGenerator numbers) {
+                                RequestNumberGenerator numbers, RepairPaymentEventRepository paymentEvents) {
+        this.paymentEvents = paymentEvents;
         this.requests = requests;
         this.history = history;
         this.profiles = profiles;
@@ -332,29 +339,119 @@ public class RepairRequestService {
 
     /**
      * order-service reports a successful payment. Accepted only for the CURRENT, approved quote while the
-     * request is AWAITING_PAYMENT and for the exact amount; a repeat of the same confirmation is a no-op.
+     * request is AWAITING_PAYMENT and for the exact amount.
+     *
+     * <p>Idempotent per quote: order-service settles at most one payment per quote (row lock + unique settlement
+     * key), so a second confirmation for the quote that was already paid is a retry, never a second payment. That
+     * includes the case where order-service timed out waiting for this call, rolled its own transaction back and the
+     * customer paid again with a new transaction id: the newer reference is adopted instead of refusing it with 409,
+     * which would otherwise make the quote unpayable forever.</p>
      */
     @Transactional
     public RepairRequestResponse confirmPayment(Long id, PaymentConfirmationRequest req) {
         RepairRequest r = requests.findById(id).orElseThrow(() -> new RepairRequestNotFoundException(id));
-        if (r.getStatus() != RepairStatus.AWAITING_PAYMENT
-                && Objects.equals(r.getPaymentTransactionId(), req.paymentTransactionId())) {
-            return view(r, false); // duplicate delivery of the same confirmation
+        if (PAID_OR_LATER.contains(r.getStatus()) && Objects.equals(r.getLatestQuoteId(), req.quoteId())) {
+            requireApprovedTotal(r, req.amountPaise());
+            if (Objects.equals(r.getPaymentTransactionId(), req.paymentTransactionId())
+                    && Objects.equals(r.getPaymentReference(), req.transactionId())) {
+                return view(r, false); // duplicate delivery of the same confirmation
+            }
+            String previous = r.getPaymentReference() != null ? r.getPaymentReference() : "#" + r.getPaymentTransactionId();
+            r.setPaymentTransactionId(req.paymentTransactionId());
+            r.setPaymentReference(req.transactionId());
+            record(r, r.getStatus(), r.getStatus(), StatusChangeActor.SYSTEM, null, "Payment reference updated from "
+                    + previous + " to " + req.transactionId() + " (order-service retried the confirmation)");
+            return save(r, false);
         }
         require(RepairAction.PAY, r);
         if (!Objects.equals(r.getLatestQuoteId(), req.quoteId())) {
             throw new RepairStateException(r.getStatus(), "Payment is for quote " + req.quoteId()
                     + " but the current quote is " + r.getLatestQuoteId() + "; the revised quote needs approval first");
         }
-        long expected = r.getQuote().getTotalPayablePaise();
-        if (req.amountPaise() != expected) {
-            throw new RepairStateException(r.getStatus(), "Payment amount " + req.amountPaise()
-                    + " paise doesn't match the approved total of " + expected + " paise");
-        }
+        requireApprovedTotal(r, req.amountPaise());
         r.setPaymentTransactionId(req.paymentTransactionId());
+        r.setPaymentReference(req.transactionId());
+        r.setPaymentStatus(RepairPaymentStatus.PAID);
+        r.setLastPaymentFailure(null);
         move(r, RepairStatus.PAID, StatusChangeActor.SYSTEM, null,
                 "Payment " + req.transactionId() + " received: " + Money.format(req.amountPaise()));
         return save(r, false);
+    }
+
+    /**
+     * order-service reports a payment event other than success: a failed / cancelled attempt (nothing charged) or
+     * a refund. Idempotent per {@code eventId}. Effects:
+     * <ul>
+     *   <li>FAILED / CANCELLED: only recorded while the request is still AWAITING_PAYMENT (a late failure of an
+     *       older attempt never overrides a payment that succeeded); the workflow status does not change.</li>
+     *   <li>PARTIALLY_REFUNDED: payment status and refunded total are updated; the job continues.</li>
+     *   <li>REFUNDED: if the work isn't finished (PAID / IN_PROGRESS) the request is closed as CANCELLED by the
+     *       system (the only way a paid request can be closed); a COMPLETED request stays COMPLETED.</li>
+     * </ul>
+     * Refunds must name the payment this request was paid with (409 otherwise).
+     */
+    @Transactional
+    public RepairRequestResponse recordPaymentEvent(Long id, PaymentEventRequest req) {
+        RepairRequest r = requests.findById(id).orElseThrow(() -> new RepairRequestNotFoundException(id));
+        if (paymentEvents.existsByEventId(req.eventId())) {
+            return view(r, false); // duplicate delivery
+        }
+        RepairStatus status = r.getStatus();
+        switch (req.type()) {
+            case FAILED, CANCELLED -> {
+                if (status == RepairStatus.AWAITING_PAYMENT) {
+                    String why = req.reason() == null || req.reason().isBlank()
+                            ? (req.type() == PaymentEventType.FAILED ? "Payment declined" : "Payment cancelled")
+                            : req.reason().strip();
+                    r.setPaymentStatus(req.type() == PaymentEventType.FAILED
+                            ? RepairPaymentStatus.FAILED : RepairPaymentStatus.CANCELLED);
+                    r.setLastPaymentFailure(truncate(why, 500));
+                    record(r, status, status, StatusChangeActor.SYSTEM, null, "Payment " + req.transactionId() + " "
+                            + req.type().name().toLowerCase(java.util.Locale.ROOT) + " (" + Money.format(req.amountPaise())
+                            + "): " + why + ". Nothing was charged; the quote can still be paid");
+                }
+            }
+            case PARTIALLY_REFUNDED, REFUNDED -> {
+                if (!req.transactionId().equals(r.getPaymentReference())) {
+                    throw new RepairStateException(status, "Refund is for payment " + req.transactionId()
+                            + " but this repair request was paid with " + (r.getPaymentReference() == null
+                            ? "no recorded payment" : r.getPaymentReference()));
+                }
+                boolean full = req.type() == PaymentEventType.REFUNDED;
+                r.setRefundedAmountPaise(Math.max(r.getRefundedAmountPaise(), req.refundedAmountPaise()));
+                if (r.getPaymentStatus() != RepairPaymentStatus.REFUNDED) {
+                    r.setPaymentStatus(full ? RepairPaymentStatus.REFUNDED : RepairPaymentStatus.PARTIALLY_REFUNDED);
+                }
+                String note = (full ? "Payment " + req.transactionId() + " fully refunded"
+                        : "Payment " + req.transactionId() + " partly refunded") + ": "
+                        + Money.format(r.getRefundedAmountPaise()) + " returned to the customer in total"
+                        + (req.reason() == null || req.reason().isBlank() ? "" : " (" + req.reason().strip() + ")");
+                if (full && RepairTransitions.closableByRefund(status)) {
+                    r.setCloseReason(truncate("Payment refunded (" + req.transactionId() + ")", 500));
+                    r.setClosedAt(LocalDateTime.now());
+                    r.setStatus(RepairStatus.CANCELLED);
+                    record(r, status, RepairStatus.CANCELLED, StatusChangeActor.SYSTEM, null,
+                            note + "; the unfinished repair is closed");
+                } else {
+                    record(r, status, status, StatusChangeActor.SYSTEM, null, note);
+                }
+            }
+            default -> throw new IllegalStateException("unhandled payment event " + req.type());
+        }
+        paymentEvents.save(new RepairPaymentEvent(req.eventId(), r.getId(), req.type(), req.transactionId(),
+                req.amountPaise(), req.refundedAmountPaise()));
+        return save(r, false);
+    }
+
+    private static final java.util.Set<RepairStatus> PAID_OR_LATER =
+            java.util.EnumSet.of(RepairStatus.PAID, RepairStatus.IN_PROGRESS, RepairStatus.COMPLETED);
+
+    private static void requireApprovedTotal(RepairRequest r, long amountPaise) {
+        long expected = r.getQuote().getTotalPayablePaise();
+        if (amountPaise != expected) {
+            throw new RepairStateException(r.getStatus(), "Payment amount " + amountPaise
+                    + " paise doesn't match the approved total of " + expected + " paise");
+        }
     }
 
     /* ═════════════════════════════ helpers ═════════════════════════════ */

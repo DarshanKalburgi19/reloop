@@ -1,0 +1,23 @@
+{
+  "id": 12,
+  "repairRequestId": 7,
+  "repairerProfileId": 1,
+  "customerAccountId": 1,
+  "revision": 1,
+  "status": "SENT",
+  "baseAmountPaise": 240000,
+  "customerFeeRate": 0.0200,
+  "customerFeePaise": 4800,
+  "totalPayablePaise": 244800,
+  "repairerCommissionRate": 0.0200,
+  "repairerCommissionPaise": 4800,
+  "repairerNetPaise": 235200,
+  "currency": "INR",
+  "summary": "Replace OLED panel and adhesive",
+  "sentAt": "2026-11-25T10:15:30",
+  "validUntil": "2026-12-02T10:15:30",
+  "approvedAt": null,
+  "rejectedAt": null,
+  "platformRevenuePaise": 9600,
+  "repairerAccountId": 4
+}

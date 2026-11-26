@@ -1,0 +1,10 @@
+{
+  "eventId": "TXN-20261125-ABCDEFGHJK:FAILED",
+  "type": "FAILED",
+  "quoteId": 12,
+  "paymentTransactionId": 34,
+  "transactionId": "TXN-20261125-ABCDEFGHJK",
+  "amountPaise": 153000,
+  "refundedAmountPaise": 0,
+  "reason": "Payment declined (simulated CARD failure); nothing was charged"
+}

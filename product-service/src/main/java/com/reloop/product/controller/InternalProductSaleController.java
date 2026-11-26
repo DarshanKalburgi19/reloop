@@ -1,6 +1,7 @@
 package com.reloop.product.controller;
 
 import com.reloop.product.dto.sale.ProductReservationRequest;
+import com.reloop.product.dto.sale.ProductSaleRefundRequest;
 import com.reloop.product.dto.sale.ProductSaleResponse;
 import com.reloop.product.security.InternalApiKeyGuard;
 import com.reloop.product.service.ProductSaleService;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
  * POST /api/internal/products/{id}/reserve       {"buyerAccountId":7,"orderReference":"ORD-…"}
  * POST /api/internal/products/{id}/confirm-sale  {"buyerAccountId":7,"orderReference":"ORD-…","transactionId":"TXN-…"}
  * POST /api/internal/products/{id}/release       {"orderReference":"ORD-…","reason":"Payment window expired"}
+ * POST /api/internal/products/{id}/sale-refund   {"orderReference":"ORD-…","transactionId":"TXN-…","refundReference":"RFD-…",
+ *                                                 "refundAmountPaise":102000,"totalRefundedPaise":102000,"fullyRefunded":true}
  * </pre>
  */
 @RestController
@@ -54,5 +57,12 @@ public class InternalProductSaleController {
                                        @PathVariable Long id, @Valid @RequestBody ProductReservationRequest body) {
         guard.verify(key);
         return sales.release(id, body);
+    }
+
+    @PostMapping(path = "/{id:\\d+}/sale-refund", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ProductSaleResponse saleRefund(@RequestHeader(name = InternalApiKeyGuard.HEADER, required = false) String key,
+                                          @PathVariable Long id, @Valid @RequestBody ProductSaleRefundRequest body) {
+        guard.verify(key);
+        return sales.recordRefund(id, body);
     }
 }

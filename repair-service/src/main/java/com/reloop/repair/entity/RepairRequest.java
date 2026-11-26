@@ -2,6 +2,7 @@ package com.reloop.repair.entity;
 
 import com.reloop.repair.enums.DeliveryMode;
 import com.reloop.repair.enums.RepairServiceCategory;
+import com.reloop.repair.enums.RepairPaymentStatus;
 import com.reloop.repair.enums.RepairStatus;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -119,6 +120,23 @@ public class RepairRequest extends BaseEntity {
 
     @Column(name = "payment_transaction_id")
     private Long paymentTransactionId;
+
+    /** Public payment reference (TXN-…) of the successful payment; the id the receipts and dashboards use. */
+    @Column(name = "payment_reference", length = 64)
+    private String paymentReference;
+
+    /** Latest payment state reported by order-service; null until the first attempt. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 20)
+    private RepairPaymentStatus paymentStatus;
+
+    /** Total refunded on the payment (paise), as reported by order-service; null = nothing refunded. */
+    @Column(name = "refunded_amount_paise")
+    private Long refundedAmountPaise;
+
+    /** Why the latest attempt failed / was cancelled; cleared once a payment succeeds. */
+    @Column(name = "last_payment_failure", length = 500)
+    private String lastPaymentFailure;
 
     /* ── Event timestamps for the timeline ─────────────────────────────── */
 
@@ -245,6 +263,38 @@ public class RepairRequest extends BaseEntity {
 
     public void setPaymentTransactionId(Long paymentTransactionId) {
         this.paymentTransactionId = paymentTransactionId;
+    }
+
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    public void setPaymentReference(String paymentReference) {
+        this.paymentReference = paymentReference;
+    }
+
+    public RepairPaymentStatus getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(RepairPaymentStatus paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public long getRefundedAmountPaise() {
+        return refundedAmountPaise == null ? 0L : refundedAmountPaise;
+    }
+
+    public void setRefundedAmountPaise(long refundedAmountPaise) {
+        this.refundedAmountPaise = refundedAmountPaise;
+    }
+
+    public String getLastPaymentFailure() {
+        return lastPaymentFailure;
+    }
+
+    public void setLastPaymentFailure(String lastPaymentFailure) {
+        this.lastPaymentFailure = lastPaymentFailure;
     }
 
     public LocalDateTime getAcceptedAt() {

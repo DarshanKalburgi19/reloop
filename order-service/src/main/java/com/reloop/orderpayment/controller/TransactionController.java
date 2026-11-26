@@ -13,6 +13,7 @@ import java.util.List;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
  *                                    &amp;download=true          … as a file (Content-Disposition: attachment)
  * GET  /api/transactions/{transactionId}/ledger              simulated ledger lines
  * POST /api/transactions/{transactionId}/refunds             provider only: {"baseAmountPaise":25000,"reason":"CUSTOMER_REQUEST"}
+ *                                                            optional Idempotency-Key header: a repeat returns the first
+ *                                                            result with Idempotent-Replay: true instead of refunding twice
  * </pre>
  */
 @RestController
@@ -78,8 +81,11 @@ public class TransactionController {
 
     @PostMapping(path = "/{transactionId}/refunds", consumes = MediaType.APPLICATION_JSON_VALUE,
                  produces = MediaType.APPLICATION_JSON_VALUE)
-    public TransactionView refund(@AuthenticationPrincipal AuthenticatedAccount caller, @PathVariable String transactionId,
-                                  @Valid @RequestBody RefundRequest body) {
-        return refunds.refundAsProvider(caller, transactionId, body);
+    public ResponseEntity<TransactionView> refund(@AuthenticationPrincipal AuthenticatedAccount caller,
+                                                  @PathVariable String transactionId,
+                                                  @RequestHeader(name = "Idempotency-Key", required = false) String key,
+                                                  @Valid @RequestBody RefundRequest body) {
+        RefundService.Result result = refunds.refundAsProvider(caller, transactionId, body, key);
+        return ResponseEntity.ok().header("Idempotent-Replay", String.valueOf(result.replayed())).body(result.transaction());
     }
 }

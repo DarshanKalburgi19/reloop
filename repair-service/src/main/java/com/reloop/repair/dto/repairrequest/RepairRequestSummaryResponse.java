@@ -2,6 +2,7 @@ package com.reloop.repair.dto.repairrequest;
 
 import com.reloop.repair.enums.RepairMethod;
 import com.reloop.repair.enums.RepairServiceCategory;
+import com.reloop.repair.enums.RepairPaymentStatus;
 import com.reloop.repair.enums.RepairStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,5 +20,7 @@ public record RepairRequestSummaryResponse(
         RepairMethod deliveryMethod,
         BigDecimal quoteTotalPayable,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt) {
+        LocalDateTime updatedAt,
+        RepairPaymentStatus paymentStatus,
+        String transactionId) {
 }

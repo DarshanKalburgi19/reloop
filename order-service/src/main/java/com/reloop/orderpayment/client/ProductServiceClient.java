@@ -14,4 +14,7 @@ public interface ProductServiceClient {
 
     /** RESERVED (by this order) → ACTIVE when the order is cancelled or expires. No-op otherwise. */
     ProductSale release(Long productId, String orderReference, String reason);
+
+    /** Records a refund of the sale on the product's passport (idempotent per refund reference). */
+    ProductSale recordRefund(Long productId, ProductSaleRefundCommand refund);
 }

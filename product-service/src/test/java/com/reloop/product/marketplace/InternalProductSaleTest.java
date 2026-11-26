@@ -153,4 +153,50 @@ class InternalProductSaleTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.orderReference").exists());
     }
+
+    /* ───────────────────────────── sale-refund ───────────────────────────── */
+
+    private ResultActions saleRefund(long id, String order, String refundRef, long amount, long total, boolean full)
+            throws Exception {
+        return call("sale-refund", id, ("{\"orderReference\":\"%s\",\"transactionId\":\"TXN-20261125-AAAAAAAAAA\","
+                + "\"refundReference\":\"%s\",\"refundAmountPaise\":%d,\"totalRefundedPaise\":%d,\"fullyRefunded\":%b,"
+                + "\"reason\":\"CUSTOMER_REQUEST\"}").formatted(order, refundRef, amount, total, full), KEY);
+    }
+
+    @Test
+    void saleRefundIsRecordedOnThePassportOncePerRefund() throws Exception {
+        reserve(productId, buyer.id(), "ORD-1").andExpect(status().isOk());
+        confirm(productId, buyer.id(), "ORD-1").andExpect(status().isOk());
+
+        saleRefund(productId, "ORD-1", "RFD-1", 25_500, 25_500, false).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SOLD"))
+                .andExpect(jsonPath("$.buyerAccountId").value(buyer.id()));
+        saleRefund(productId, "ORD-1", "RFD-1", 25_500, 25_500, false).andExpect(status().isOk()); // duplicate delivery
+        saleRefund(productId, "ORD-1", "RFD-2", 76_500, 102_000, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SOLD"));
+
+        MvcResult passport = mvc.perform(get("/api/products/" + productId + "/passport")).andReturn();
+        assertThat(eventTypes(passport)).containsExactly("LISTED", "RESERVED", "SOLD", "SALE_REFUNDED", "SALE_REFUNDED");
+        mvc.perform(get("/api/products/" + productId + "/passport"))
+                .andExpect(jsonPath("$.history[3].details").value(org.hamcrest.Matchers.containsString("partly refunded")))
+                .andExpect(jsonPath("$.history[4].details").value(org.hamcrest.Matchers.containsString("fully refunded")))
+                .andExpect(jsonPath("$.history[4].details").value(org.hamcrest.Matchers.containsString("RFD-2")));
+    }
+
+    @Test
+    void saleRefundNeedsTheMatchingSaleTheKeyAndAValidBody() throws Exception {
+        // not sold yet / sold through another order
+        saleRefund(productId, "ORD-1", "RFD-1", 100, 100, true).andExpect(status().isConflict());
+        reserve(productId, buyer.id(), "ORD-1").andExpect(status().isOk());
+        confirm(productId, buyer.id(), "ORD-1").andExpect(status().isOk());
+        saleRefund(productId, "ORD-OTHER", "RFD-1", 100, 100, true).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("was not sold through order ORD-OTHER")));
+        saleRefund(999_999, "ORD-1", "RFD-1", 100, 100, true).andExpect(status().isNotFound());
+
+        call("sale-refund", productId, "{\"orderReference\":\"ORD-1\"}", KEY).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.refundReference").exists());
+        call("sale-refund", productId, "{\"orderReference\":\"ORD-1\",\"transactionId\":\"T\",\"refundReference\":\"R\","
+                + "\"refundAmountPaise\":1,\"totalRefundedPaise\":1,\"fullyRefunded\":true}", null)
+                .andExpect(status().isUnauthorized());
+    }
 }

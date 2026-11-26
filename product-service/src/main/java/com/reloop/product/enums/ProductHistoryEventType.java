@@ -19,5 +19,7 @@ public enum ProductHistoryEventType {
     /** A buyer placed an order (order-service); the listing is held until it is paid, cancelled or expires. */
     RESERVED,
     /** The order holding the listing was cancelled or expired; the listing is ACTIVE again. */
-    RESERVATION_RELEASED
+    RESERVATION_RELEASED,
+    /** order-service refunded (part of) the sale; the product stays SOLD, the passport records the reversal. */
+    SALE_REFUNDED
 }

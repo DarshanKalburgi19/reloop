@@ -11,4 +11,11 @@ public interface RepairServiceClient {
      * @throws RepairServiceException 503 unreachable, 409 refused (wrong state/amount/quote), 502 otherwise
      */
     void confirmPayment(Long repairRequestId, PaymentConfirmation confirmation);
+
+    /**
+     * Reports a failed / cancelled attempt or a refund to repair-service (idempotent per {@code eventId}).
+     * Throws {@link com.reloop.orderpayment.exception.RepairServiceException} (409 / 502 / 503) like
+     * {@link #confirmPayment}.
+     */
+    void reportPaymentEvent(Long repairRequestId, RepairPaymentEvent event);
 }

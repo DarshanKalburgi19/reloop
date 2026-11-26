@@ -2,6 +2,7 @@ package com.reloop.repair.dto.repairrequest;
 
 import com.reloop.repair.enums.RepairMethod;
 import com.reloop.repair.enums.RepairServiceCategory;
+import com.reloop.repair.enums.RepairPaymentStatus;
 import com.reloop.repair.enums.RepairStatus;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +30,10 @@ public record RepairRequestResponse(
         String inspectionNotes,
         QuoteResponse quote,
         Long paymentTransactionId,
+        String transactionId,
+        RepairPaymentStatus paymentStatus,
+        long refundedAmountPaise,
+        String lastPaymentFailure,
         String closeReason,
         List<String> allowedActions,
         LocalDateTime createdAt,

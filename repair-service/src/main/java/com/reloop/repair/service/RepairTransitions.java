@@ -61,4 +61,13 @@ public final class RepairTransitions {
     public static Set<RepairStatus> next(RepairStatus from) {
         return Collections.unmodifiableSet(NEXT.get(from));
     }
+
+    /**
+     * System-only exit used when order-service reports a FULL refund of an unfinished job: PAID / IN_PROGRESS →
+     * CANCELLED. Deliberately not part of the transition table, so neither the customer nor the repairer can cancel
+     * a paid repair (see {@code cannotCancelOncePaid}); only a completed refund closes it.
+     */
+    public static boolean closableByRefund(RepairStatus from) {
+        return from == RepairStatus.PAID || from == RepairStatus.IN_PROGRESS;
+    }
 }

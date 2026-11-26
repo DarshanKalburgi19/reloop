@@ -57,23 +57,31 @@ public class HttpProductServiceClient implements ProductServiceClient {
     @Override
     public ProductSale reserve(Long productId, Long buyerAccountId, String orderReference) {
         return call("reserve", productId, new ProductReservationCommand(buyerAccountId, orderReference, null, null),
-                "Product could not be reserved");
+                "Product could not be reserved", "Product service is unavailable; nothing was charged. Try again shortly");
     }
 
     @Override
     public ProductSale confirmSale(Long productId, Long buyerAccountId, String orderReference, String transactionId) {
         return call("confirm-sale", productId,
                 new ProductReservationCommand(buyerAccountId, orderReference, transactionId, null),
-                "Product service failed to record the sale; the payment was not taken");
+                "Product service failed to record the sale; the payment was not taken",
+                "Product service is unavailable; nothing was charged. Try again shortly");
     }
 
     @Override
     public ProductSale release(Long productId, String orderReference, String reason) {
         return call("release", productId, new ProductReservationCommand(null, orderReference, null, reason),
-                "Product service failed to release the reservation");
+                "Product service failed to release the reservation",
+                "Product service is unavailable; the reservation was not released. Try again shortly");
     }
 
-    private ProductSale call(String action, Long productId, ProductReservationCommand body, String fallback) {
+    @Override
+    public ProductSale recordRefund(Long productId, ProductSaleRefundCommand refund) {
+        return call("sale-refund", productId, refund, "Product service failed to record the refund; the refund was not issued",
+                "Product service is unavailable; the refund was not issued. Try again shortly");
+    }
+
+    private ProductSale call(String action, Long productId, Object body, String fallback, String unavailable) {
         try {
             return restClient.post()
                     .uri("/api/internal/products/{id}/" + action, productId)
@@ -83,7 +91,7 @@ public class HttpProductServiceClient implements ProductServiceClient {
                     .body(ProductSale.class);
         } catch (ResourceAccessException ex) {
             log.warn("product-service unreachable ({}): {}", action, ex.getMessage());
-            throw new ProductServiceException(503, "Product service is unavailable; nothing was charged. Try again shortly", ex);
+            throw new ProductServiceException(503, unavailable, ex);
         } catch (RestClientResponseException ex) {
             int status = ex.getStatusCode().value();
             if (status == 404 || status == 403 || status == 409) {

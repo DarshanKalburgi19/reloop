@@ -1,6 +1,7 @@
 package com.reloop.orderpayment.service;
 
 import com.reloop.orderpayment.client.PaymentConfirmation;
+import com.reloop.orderpayment.client.RepairPaymentEvent;
 import com.reloop.orderpayment.client.ProductServiceClient;
 import com.reloop.orderpayment.client.RepairServiceClient;
 import com.reloop.orderpayment.dto.payment.SimulatePaymentRequest;
@@ -64,6 +65,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class PaymentService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PaymentService.class);
 
     public static final String REFERENCE_REPAIR_QUOTE = "REPAIR_QUOTE";
     public static final String REFERENCE_PURCHASE_ORDER = "PURCHASE_ORDER";
@@ -226,6 +229,7 @@ public class PaymentService {
 
         if (req.outcomeOrDefault() != SimulatedOutcome.SUCCESS) {
             recordUnsuccessful(p, req.outcomeOrDefault(), now);
+            reportUnsuccessful(quote, p);
             return new Result(views.view(p), false);
         }
 
@@ -261,6 +265,22 @@ public class PaymentService {
         }
         p.setCompletedAt(now);
         payments.saveAndFlush(p);
+    }
+
+    /**
+     * Tells repair-service about a failed / cancelled repair payment so the request timeline and both dashboards
+     * show it. Best effort: nothing was charged, so the attempt is kept (and visible in the customer's payment
+     * history) even when repair-service can't be reached; the next attempt or a success brings it up to date.
+     */
+    private void reportUnsuccessful(RepairQuote quote, PaymentTransaction p) {
+        String type = p.getStatus() == PaymentStatus.CANCELLED ? RepairPaymentEvent.CANCELLED : RepairPaymentEvent.FAILED;
+        try {
+            repairService.reportPaymentEvent(quote.getRepairRequestExternalId(), new RepairPaymentEvent(
+                    p.getTransactionId() + ":" + type, type, quote.getId(), p.getId(), p.getTransactionId(),
+                    p.getTotalChargedPaise(), 0L, p.getFailureReason()));
+        } catch (RuntimeException ex) {
+            log.warn("could not report {} payment {} to repair-service: {}", type, p.getTransactionId(), ex.getMessage());
+        }
     }
 
     /** SUCCESS: payment + separate commission + separate payout + balanced ledger lines. */
