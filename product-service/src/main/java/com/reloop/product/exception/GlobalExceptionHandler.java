@@ -159,6 +159,16 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "Your account role is not allowed to use this endpoint", req, Map.of());
     }
 
+    @ExceptionHandler(InvalidInternalKeyException.class)
+    public ResponseEntity<ApiError> invalidInternalKey(InvalidInternalKeyException ex, HttpServletRequest req) {
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), req, Map.of());
+    }
+
+    @ExceptionHandler(DirectPurchaseDisabledException.class)
+    public ResponseEntity<ApiError> directPurchaseDisabled(DirectPurchaseDisabledException ex, HttpServletRequest req) {
+        return build(HttpStatus.GONE, ex.getMessage(), req, Map.of());
+    }
+
     @ExceptionHandler(RepairServiceException.class)
     public ResponseEntity<ApiError> repairService(RepairServiceException ex, HttpServletRequest req) {
         return build(HttpStatus.valueOf(ex.getStatus()), ex.getMessage(), req, Map.of());

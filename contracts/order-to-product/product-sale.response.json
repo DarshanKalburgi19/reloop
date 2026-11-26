@@ -1,0 +1,10 @@
+{
+  "productId": 42,
+  "title": "iPhone 12, 128 GB",
+  "sellerAccountId": 701,
+  "buyerAccountId": 501,
+  "pricePaise": 100000,
+  "status": "SOLD",
+  "passportCode": "RLP-ABCD-2345",
+  "reservationReference": "ORD-2026-1006"
+}

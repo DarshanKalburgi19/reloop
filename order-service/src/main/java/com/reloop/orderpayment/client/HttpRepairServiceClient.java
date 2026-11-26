@@ -55,25 +55,45 @@ public class HttpRepairServiceClient implements RepairServiceClient {
 
     @Override
     public void confirmPayment(Long repairRequestId, PaymentConfirmation confirmation) {
+        post("/api/internal/repair-requests/{id}/payment-confirmation", repairRequestId, confirmation,
+                "Repair service refused the payment",
+                "Repair service is unavailable; the payment was not taken. Try again shortly",
+                "Repair service failed to record the payment; the payment was not taken");
+    }
+
+    @Override
+    public void reportPaymentEvent(Long repairRequestId, RepairPaymentEvent event) {
+        boolean refund = RepairPaymentEvent.REFUNDED.equals(event.type())
+                || RepairPaymentEvent.PARTIALLY_REFUNDED.equals(event.type());
+        post("/api/internal/repair-requests/{id}/payment-events", repairRequestId, event,
+                "Repair service refused the payment event",
+                refund ? "Repair service is unavailable; the refund was not issued. Try again shortly"
+                        : "Repair service is unavailable; the failed payment could not be reported",
+                refund ? "Repair service failed to record the refund; the refund was not issued"
+                        : "Repair service failed to record the failed payment");
+    }
+
+    private void post(String path, Long repairRequestId, Object body, String conflictFallback, String unavailable,
+                      String failed) {
         try {
             restClient.post()
-                    .uri("/api/internal/repair-requests/{id}/payment-confirmation", repairRequestId)
+                    .uri(path, repairRequestId)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(confirmation)
+                    .body(body)
                     .retrieve()
                     .toBodilessEntity();
         } catch (ResourceAccessException ex) {
             log.warn("repair-service unreachable: {}", ex.getMessage());
-            throw new RepairServiceException(503, "Repair service is unavailable; the payment was not taken. Try again shortly", ex);
+            throw new RepairServiceException(503, unavailable, ex);
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().value() == HttpStatus.CONFLICT.value()) {
-                throw new RepairServiceException(409, messageOf(ex, "Repair service refused the payment"), ex);
+                throw new RepairServiceException(409, messageOf(ex, conflictFallback), ex);
             }
             log.warn("repair-service answered {}: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            throw new RepairServiceException(502, "Repair service failed to record the payment; the payment was not taken", ex);
+            throw new RepairServiceException(502, failed, ex);
         } catch (RestClientException ex) {
             log.warn("repair-service call failed: {}", ex.getMessage());
-            throw new RepairServiceException(502, "Repair service failed to record the payment; the payment was not taken", ex);
+            throw new RepairServiceException(502, failed, ex);
         }
     }
 

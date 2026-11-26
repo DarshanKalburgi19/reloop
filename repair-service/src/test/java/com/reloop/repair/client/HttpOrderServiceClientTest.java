@@ -44,10 +44,11 @@ class HttpOrderServiceClientTest {
                 .andExpect(jsonPath("$.repairRequestId").value(7))
                 .andExpect(jsonPath("$.requestNumber").value("RR-20261125-ABCDEFGH"))
                 .andExpect(jsonPath("$.baseAmountPaise").value(150000))
+                .andExpect(jsonPath("$.repairerAccountId").value(55))
                 .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON)
                         .body(QUOTE_JSON.formatted("SENT")));
 
-        QuoteView q = client.createQuote(new CreateQuoteCommand(7L, "RR-20261125-ABCDEFGH", 3L, 44L, 150_000L, "Screen"));
+        QuoteView q = client.createQuote(new CreateQuoteCommand(7L, "RR-20261125-ABCDEFGH", 3L, 44L, 150_000L, "Screen", 55L));
 
         assertThat(q.id()).isEqualTo(12L);
         assertThat(q.revision()).isEqualTo(2);
@@ -87,15 +88,49 @@ class HttpOrderServiceClientTest {
     void serverErrorsBecomeBadGateway() {
         server.expect(requestTo(BASE + "/api/internal/repair-quotes")).andRespond(withServerError());
 
-        assertThatThrownBy(() -> client.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x")))
+        assertThatThrownBy(() -> client.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x", 55L)))
                 .isInstanceOfSatisfying(OrderServiceException.class, ex -> assertThat(ex.getStatus()).isEqualTo(502));
+    }
+
+    @Test
+    void getOrderReadsTheInternalOrderView() {
+        server.expect(requestTo(BASE + "/api/internal/orders/31"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Internal-Api-Key", "k3y"))
+                .andRespond(withSuccess("""
+                        {"id":31,"orderNumber":"ORD-20261125-ABCDEFGHJK","status":"CONFIRMED","buyerAccountId":501,
+                         "sellerAccountId":701,"productId":42,"productTitle":"Used Sony headphones",
+                         "paidAt":"2026-11-25T10:15:30","somethingNew":true}
+                        """, MediaType.APPLICATION_JSON));
+
+        MarketplaceOrderView order = client.getOrder(31L);
+
+        assertThat(order.orderNumber()).isEqualTo("ORD-20261125-ABCDEFGHJK");
+        assertThat(order.buyerAccountId()).isEqualTo(501L);
+        assertThat(order.sellerAccountId()).isEqualTo(701L);
+        assertThat(order.isConfirmed()).isTrue();
+        assertThat(order.paidAt()).isNotNull();
+        server.verify();
+    }
+
+    @Test
+    void unknownOrderIsNotFound() {
+        server.expect(requestTo(BASE + "/api/internal/orders/32"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"status\":404,\"message\":\"Order 32 not found\"}"));
+
+        assertThatThrownBy(() -> client.getOrder(32L))
+                .isInstanceOfSatisfying(OrderServiceException.class, ex -> {
+                    assertThat(ex.getStatus()).isEqualTo(404);
+                    assertThat(ex.getMessage()).isEqualTo("Order 32 not found");
+                });
     }
 
     @Test
     void unreachableIsServiceUnavailable() {
         HttpOrderServiceClient offline = new HttpOrderServiceClient("http://localhost:1", "k3y");
 
-        assertThatThrownBy(() -> offline.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x")))
+        assertThatThrownBy(() -> offline.createQuote(new CreateQuoteCommand(7L, "RR", 3L, 44L, 100L, "x", 55L)))
                 .isInstanceOfSatisfying(OrderServiceException.class, ex -> assertThat(ex.getStatus()).isEqualTo(503));
     }
 }

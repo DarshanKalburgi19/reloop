@@ -124,10 +124,27 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
+    @ExceptionHandler(DeliveryStateException.class)
+    public ResponseEntity<Map<String, Object>> deliveryState(DeliveryStateException ex, HttpServletRequest req) {
+        Map<String, Object> body = body(HttpStatus.CONFLICT, ex.getMessage(), req);
+        body.put("currentStatus", ex.getCurrentStatus());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(DeliveryNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> deliveryNotFound(DeliveryNotFoundException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body(HttpStatus.NOT_FOUND, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(DeliveryForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> deliveryForbidden(DeliveryForbiddenException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body(HttpStatus.FORBIDDEN, ex.getMessage(), req));
+    }
+
     @ExceptionHandler({RepairerUnavailableException.class, OptimisticLockingFailureException.class})
     public ResponseEntity<Map<String, Object>> busy(RuntimeException ex, HttpServletRequest req) {
         String message = ex instanceof OptimisticLockingFailureException
-                ? "This repair request was changed by someone else at the same time. Reload it and try again."
+                ? "This record was changed by someone else at the same time. Reload it and try again."
                 : ex.getMessage();
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body(HttpStatus.CONFLICT, message, req));
     }

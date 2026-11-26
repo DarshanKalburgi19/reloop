@@ -130,6 +130,9 @@ erDiagram
 
 ## 2) order-service — DB `reloop_order`
 
+All money columns are `bigint` paise and all rates are `decimal(8,6)`. Each order, quote, payment, commission and
+payout row keeps the rates that were in force when it was created (see docs/PAYMENTS.md).
+
 ```mermaid
 erDiagram
     PURCHASE_ORDER ||--o{ ORDER_ITEM : contains
@@ -138,22 +141,34 @@ erDiagram
     PAYMENT_TRANSACTION ||--o| COMMISSION_RECORD : "on SUCCESS"
     PAYMENT_TRANSACTION ||--o| PROVIDER_PAYOUT : "on SUCCESS"
     PAYMENT_TRANSACTION ||--o{ REFUND_RECORD : "0..n refunds"
+    PAYMENT_TRANSACTION ||--o{ LEDGER_ENTRY : "4 lines on SUCCESS"
+    REFUND_RECORD ||--o{ LEDGER_ENTRY : "4 reversal lines"
+    LEDGER_ENTRY ||--o| LEDGER_ENTRY : "reversal_of"
 
     PURCHASE_ORDER {
         bigint id PK
-        string order_number UK "uk_orders_number"
+        string order_number UK "ORD-yyyyMMdd-XXXXXXXXXX"
         bigint buyer_account_id "ext product-service - indexed"
         bigint seller_account_id "ext product-service - indexed"
-        string status "enum PENDING|PAID|CANCELLED|REFUNDED - indexed"
+        bigint product_external_id "ext product-service - indexed"
+        string status "PENDING_PAYMENT|CONFIRMED|CANCELLED|PARTIALLY_REFUNDED|REFUNDED"
         bigint subtotal_paise
-        decimal customer_fee_rate "frozen 0.0200"
+        decimal customer_fee_rate "frozen"
         bigint customer_fee_paise
         bigint total_paise "subtotal + customer fee"
+        decimal provider_commission_rate "frozen"
+        bigint provider_commission_paise
+        bigint seller_net_paise "subtotal - commission"
+        bigint platform_revenue_paise "fee + commission"
+        bigint refunded_amount_paise
         string currency
+        timestamp expires_at "payment window - indexed"
         timestamp paid_at
         timestamp cancelled_at
-        timestamp created_at
-        timestamp updated_at
+        string cancel_reason
+        boolean product_released "reservation released in product-service"
+        string failure_reason "last failed attempt"
+        timestamp refunded_at
     }
     ORDER_ITEM {
         bigint id PK
@@ -163,96 +178,126 @@ erDiagram
         bigint unit_price_paise
         int quantity
         bigint line_total_paise
-        timestamp created_at
-        timestamp updated_at
     }
     REPAIR_QUOTE {
         bigint id PK
         bigint repair_request_id "ext repair-service - UK with quote_revision"
         bigint repairer_profile_id "ext repair-service - indexed"
+        bigint repairer_account_id "ext product-service - indexed (payouts)"
         bigint customer_account_id "ext product-service"
         int quote_revision "1,2,3..."
-        string status "enum DRAFT|SENT|APPROVED|REJECTED|SUPERSEDED"
+        string status "DRAFT|SENT|APPROVED|REJECTED|SUPERSEDED"
         string summary
         bigint base_amount_paise
-        decimal customer_fee_rate "frozen 0.0200"
+        decimal customer_fee_rate "frozen"
         bigint customer_fee_paise
         bigint total_payable_paise "base + customer fee"
-        decimal repairer_commission_rate "frozen 0.0200"
+        decimal repairer_commission_rate "frozen"
         bigint repairer_commission_paise
         bigint repairer_net_paise "base - commission"
         timestamp sent_at
         timestamp approved_at
         timestamp rejected_at
         timestamp valid_until
-        timestamp created_at
-        timestamp updated_at
     }
     PAYMENT_TRANSACTION {
         bigint id PK
-        string transaction_id UK "NEVER duplicated"
-        bigint purchase_order_id FK "nullable - exactly one ref (CHECK)"
-        bigint repair_quote_id FK "nullable - exactly one ref (CHECK)"
-        bigint buyer_account_id "ext product-service - indexed"
-        bigint provider_id "ext seller/repairer - indexed"
-        string provider_type "enum SELLER|REPAIRER"
-        string method "enum UPI|CARD|NET_BANKING|WALLET"
-        string status "enum PENDING|SUCCESS|FAILURE|CANCELLED - indexed"
+        string transaction_id UK "TXN-... never duplicated"
+        string transaction_type "MARKETPLACE_PURCHASE|REPAIR_BOOKING - indexed"
+        bigint purchase_order_id "exactly one ref (CHECK)"
+        bigint repair_quote_id "exactly one ref (CHECK)"
+        bigint buyer_account_id "indexed"
+        bigint provider_id "seller account or repairer profile"
+        bigint provider_account_id "seller/repairer account - indexed"
+        string provider_type "SELLER|REPAIRER"
+        string method "UPI|CARD|NET_BANKING|WALLET"
+        string status "SUCCESS|FAILED|CANCELLED|PARTIALLY_REFUNDED|REFUNDED"
         bigint base_amount_paise
         decimal customer_fee_rate "rate at transaction time"
         bigint customer_fee_paise
         bigint total_charged_paise "base + customer fee"
-        decimal repairer_commission_rate "rate at transaction time"
-        bigint repairer_commission_paise
+        decimal repairer_commission_rate "provider commission rate (column name kept)"
+        bigint repairer_commission_paise "provider commission"
         bigint provider_net_paise "base - commission"
+        bigint platform_revenue_paise "fee + commission"
+        bigint refunded_amount_paise
+        string settlement_key UK "ORDER-id|QUOTE-id, SUCCESS only"
+        string idempotency_key "UK with buyer_account_id"
         string failure_reason
         timestamp attempted_at
         timestamp completed_at
-        timestamp created_at
-        timestamp updated_at
     }
     COMMISSION_RECORD {
         bigint id PK
         bigint payment_transaction_id UK "one per txn"
-        string transaction_id UK "business lookup"
+        string transaction_id UK "COM-..."
+        string transaction_type
         string reference_type "PURCHASE_ORDER|REPAIR_QUOTE"
         bigint reference_id
         decimal customer_fee_rate "frozen"
         bigint customer_fee_paise
         decimal provider_commission_rate "frozen"
         bigint provider_commission_paise
-        bigint total_commission_paise "both fees = ReLoop revenue"
-        string status "enum RECORDED|REVERSED"
-        timestamp created_at
-        timestamp updated_at
+        bigint total_commission_paise "ReLoop revenue"
+        bigint reversed_customer_fee_paise
+        bigint reversed_provider_commission_paise
+        string status "RECORDED|PARTIALLY_REVERSED|REVERSED"
     }
     PROVIDER_PAYOUT {
         bigint id PK
-        string payout_reference UK
+        string payout_reference UK "PO-..."
         bigint payment_transaction_id UK "one per txn"
-        bigint provider_id "indexed - external"
-        string provider_type "enum SELLER|REPAIRER"
-        bigint provider_account_id
+        bigint provider_id "indexed"
+        string provider_type "SELLER|REPAIRER"
+        bigint provider_account_id "indexed - dashboards"
+        string transaction_type
         bigint gross_amount_paise
         bigint commission_paise
         bigint net_amount_paise "gross - commission"
-        string status "enum PENDING|PAID|ON_HOLD|REVERSED - indexed"
+        bigint refunded_gross_paise
+        bigint reversed_commission_paise
+        bigint reversed_net_paise
+        string status "PENDING|PAID|ON_HOLD|PARTIALLY_REVERSED|REVERSED"
         timestamp paid_at
-        timestamp created_at
-        timestamp updated_at
     }
     REFUND_RECORD {
         bigint id PK
-        string refund_reference UK
+        string refund_reference UK "RFD-..."
         bigint payment_transaction_id "indexed"
+        string transaction_type
         bigint order_id
-        bigint refund_amount_paise
-        bigint reversed_commission_paise
-        string status "enum INITIATED|COMPLETED|FAILED - indexed"
-        string reason "enum ORDER_CANCELLED|DISPUTED_ORDER|CUSTOMER_REQUEST"
+        bigint refund_amount_paise "to the customer (base + fee share)"
+        bigint refunded_base_paise
+        bigint refunded_customer_fee_paise
+        bigint reversed_provider_commission_paise
+        bigint provider_net_reversed_paise
+        bigint reversed_commission_paise "ReLoop revenue reversed"
+        string status "INITIATED|COMPLETED|FAILED"
+        string reason "CUSTOMER_REQUEST|ITEM_NOT_AS_DESCRIBED|REPAIR_NOT_COMPLETED|DISPUTED_ORDER|ORDER_CANCELLED|OTHER"
+        string note
+        bigint initiated_by_account_id "null = ReLoop support"
         timestamp completed_at
-        timestamp created_at
-        timestamp updated_at
+    }
+    LEDGER_ENTRY {
+        bigint id PK
+        bigint payment_transaction_id "indexed"
+        string transaction_reference "TXN-..."
+        bigint refund_record_id "indexed - reversal lines"
+        string transaction_type
+        string entry_type "PAYMENT|REFUND"
+        string account "CUSTOMER_PAYMENTS|PROVIDER_PAYABLE|PLATFORM_FEE_REVENUE|PLATFORM_COMMISSION_REVENUE"
+        string direction "DEBIT|CREDIT"
+        bigint amount_paise "CHECK > 0"
+        bigint party_account_id "buyer or provider"
+        bigint reversal_of_entry_id "line being reversed"
+        string description
+    }
+    FEE_RATE_CONFIG {
+        bigint id PK
+        string transaction_type UK
+        decimal customer_fee_rate "CHECK 0..0.5"
+        decimal provider_commission_rate "CHECK 0..0.5"
+        string note
     }
 ```
 
@@ -270,7 +315,8 @@ erDiagram
     REPAIR_REQUEST ||--o{ REPAIR_STATUS_HISTORY : timeline
     REPAIR_REQUEST ||--o{ REPAIR_REQUEST_IMAGE : photos
     REPAIR_REQUEST ||--o{ INVENTORY_MOVEMENT : "parts used"
-    REPAIR_REQUEST ||--o{ DELIVERY_TRACKING : shipments
+    REPAIR_REQUEST |o--o{ DELIVERY : "repair legs (simulated)"
+    DELIVERY ||--o{ DELIVERY_LOCATION_POINT : "coordinate history"
     SPARE_PART ||--o{ INVENTORY_MOVEMENT : movements
     REPAIRER_PROFILE ||--o{ INVENTORY_MOVEMENT : owns
 
@@ -418,21 +464,48 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    DELIVERY_TRACKING {
+    DELIVERY {
         bigint id PK
-        bigint repair_request_id FK "indexed with status"
-        string tracking_number "indexed"
-        string carrier
-        string status "CREATED..DELIVERED|FAILED"
-        string origin_location
-        string destination_location
-        double current_latitude
-        double current_longitude
-        string event_note
-        timestamp estimated_delivery_at
+        string tracking_number UK "TRK-SIM-yyyyMMdd-XXXXXXXX"
+        string delivery_type "STORE_TO_CUSTOMER|CUSTOMER_TO_REPAIRER|REPAIRER_TO_CUSTOMER"
+        bigint repair_request_id FK "nullable - repair legs; UK with type"
+        bigint order_external_id "ext order-service - no FK; UK with type"
+        string reference_number "RR-... or ORD-..."
+        bigint customer_account_id "ext - buyer or repair customer"
+        bigint partner_account_id "ext - seller or repairer"
+        bigint booked_by_account_id
+        string origin_code "demo location snapshot"
+        double origin_latitude
+        double origin_longitude
+        string destination_code "demo location snapshot"
+        double destination_latitude
+        double destination_longitude
+        double route_distance_km "straight line x road factor"
+        double current_latitude "simulated"
+        double current_longitude "simulated"
+        int simulation_step "0..7"
+        int progress_percent
+        string status "BOOKED|PICKED_UP|IN_TRANSIT|NEAR_DESTINATION|DELIVERED"
+        timestamp estimated_arrival_at
+        timestamp picked_up_at
         timestamp delivered_at
+        timestamp last_advanced_at
+        bigint version "optimistic lock"
         timestamp created_at
         timestamp updated_at
+    }
+    DELIVERY_LOCATION_POINT {
+        bigint id PK
+        bigint delivery_id FK "UK with sequence_no"
+        int sequence_no "0 = booking"
+        string status
+        double latitude "simulated"
+        double longitude "simulated"
+        int progress_percent
+        double remaining_km
+        string note
+        bigint recorded_by_account_id
+        timestamp recorded_at "append-only"
     }
 ```
 
@@ -454,9 +527,13 @@ flowchart LR
     subgraph RS["repair-service :8083"]
         RP["RepairerProfile"]
         RR["RepairRequest"]
+        DL["Delivery (simulated)"]
     end
     PO -- "buyer/seller_account_id (no FK)" --> ACC
     RQ -- "customer_account_id" --> ACC
+    RQ -- "repairer_account_id (payouts)" --> ACC
+    PO -- "product_external_id (reserve / confirm-sale / release over REST)" --> PRD
+    PT -- "provider_account_id" --> ACC
     RQ -- "repair_request_id (ext)" --> RR
     RR -- "customer_account_id" --> ACC
     RR -- "delivery_address_id (ext)" --> ADDR
@@ -466,4 +543,6 @@ flowchart LR
     RP -- "account_external_id" --> ACC
     RAI -- "repairer_profile_id (ext)" --> RP
     OS -. "OrderItem.product_external_id" .-> PRD
+    DL -- "order_external_id (GET /api/internal/orders/{id} at booking)" --> PO
+    DL -- "customer/partner_account_id" --> ACC
 ```

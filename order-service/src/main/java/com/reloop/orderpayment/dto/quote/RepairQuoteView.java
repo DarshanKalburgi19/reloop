@@ -27,13 +27,16 @@ public record RepairQuoteView(
         LocalDateTime sentAt,
         LocalDateTime validUntil,
         LocalDateTime approvedAt,
-        LocalDateTime rejectedAt) {
+        LocalDateTime rejectedAt,
+        long platformRevenuePaise,
+        Long repairerAccountId) {
 
     public static RepairQuoteView of(RepairQuote q) {
         return new RepairQuoteView(q.getId(), q.getRepairRequestExternalId(), q.getRepairerProfileId(),
                 q.getCustomerAccountId(), q.getQuoteRevision(), q.getStatus().name(), q.getBaseAmountPaise(),
                 q.getCustomerFeeRate(), q.getCustomerFeePaise(), q.getTotalPayablePaise(), q.getRepairerCommissionRate(),
                 q.getRepairerCommissionPaise(), q.getRepairerNetPaise(), q.getCurrency(), q.getSummary(), q.getSentAt(),
-                q.getValidUntil(), q.getApprovedAt(), q.getRejectedAt());
+                q.getValidUntil(), q.getApprovedAt(), q.getRejectedAt(),
+                q.getCustomerFeePaise() + q.getRepairerCommissionPaise(), q.getRepairerAccountId());
     }
 }

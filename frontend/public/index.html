@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReLoop — Buy pre-loved, sell, and repair before you replace</title>
+  <meta name="description" content="ReLoop is a sustainable marketplace for pre-loved products and local repair workshops in Gujarat, with every fee shown up front.">
+  <meta name="theme-color" content="#1f5c45">
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
+  <link rel="stylesheet" href="/assets/css/reloop.css">
+</head>
+<body data-layout="public" data-nav="home">
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="rl-navbar"></div>
+<main id="main" tabindex="-1">
+  <section class="hero">
+    <div class="container">
+      <div class="row g-5 align-items-center">
+        <div class="col-lg-7">
+          <span class="eyebrow mb-2">Circular commerce for Gujarat</span>
+          <h1 class="display-title mb-3">Buy pre-loved. Sell what you don't use. Repair before you replace.</h1>
+          <p class="hero-lead mb-4">ReLoop connects people who want to give products a second life with local repair workshops. Every rupee is accounted for: you see the platform fee and the seller's commission before you pay.</p>
+          <div class="d-flex flex-wrap gap-2" id="hero-actions">
+            <a class="btn btn-primary btn-lg" href="/marketplace.html"><i class="bi bi-bag me-1" aria-hidden="true"></i>Browse the marketplace</a>
+            <a class="btn btn-outline-primary btn-lg" href="/repairers.html"><i class="bi bi-tools me-1" aria-hidden="true"></i>Find a repairer</a>
+          </div>
+          <div class="d-flex flex-wrap gap-4 mt-4 small text-muted">
+            <span><i class="bi bi-shield-check text-success me-1" aria-hidden="true"></i>Every fee itemised</span>
+            <span><i class="bi bi-qr-code me-1" aria-hidden="true"></i>Product passports</span>
+            <span><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>Local workshops</span>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="hero-panel" aria-live="polite">
+            <div class="small-caps text-white-50 mb-1">Transparent by design</div>
+            <h2 class="h4 mb-2">Where your ₹1,000 goes</h2>
+            <div id="hero-fees"><div class="rl-loader text-white-50"><span class="spinner-border" aria-hidden="true"></span><span>Loading current rates…</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="feature-icon"><i class="bi bi-bag-heart" aria-hidden="true"></i></div>
+          <h2 class="h5">Buy pre-loved</h2>
+          <p class="text-muted">Quality-checked categories, honest condition grades and a product passport that records each item's history.</p>
+          <a href="/marketplace.html" class="fw-semibold text-decoration-none">Shop the marketplace <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+        </div>
+        <div class="col-md-4">
+          <div class="feature-icon"><i class="bi bi-tag" aria-hidden="true"></i></div>
+          <h2 class="h5">Sell in minutes</h2>
+          <p class="text-muted">List an item with photos and a fair price. You see your net earnings after ReLoop's commission before you publish.</p>
+          <a href="/customer/sell.html" class="fw-semibold text-decoration-none">Start selling <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+        </div>
+        <div class="col-md-4">
+          <div class="feature-icon"><i class="bi bi-wrench-adjustable" aria-hidden="true"></i></div>
+          <h2 class="h5">Repair locally</h2>
+          <p class="text-muted">Compare workshops by service, price and distance. Approve a quote only after you see every fee.</p>
+          <a href="/repairers.html" class="fw-semibold text-decoration-none">Find a workshop <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+        <div><span class="eyebrow">Just listed</span><h2 class="h3 mb-0">Fresh on the marketplace</h2></div>
+        <a class="btn btn-light" href="/marketplace.html">View all products <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+      </div>
+      <div id="home-products"></div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+        <div><span class="eyebrow">Repair first</span><h2 class="h3 mb-0">Top-rated workshops</h2></div>
+        <a class="btn btn-light" href="/repairers.html">All repairers <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+      </div>
+      <div id="home-repairers"></div>
+    </div>
+  </section>
+
+  <section class="section" id="fees">
+    <div class="container">
+      <div class="row g-5">
+        <div class="col-lg-5">
+          <span class="eyebrow">How fees work</span>
+          <h2 class="h3">No hidden charges. Ever.</h2>
+          <p class="text-muted">ReLoop earns from two clearly labelled amounts, and both are always shown before you pay:</p>
+          <ul class="list-plain d-grid gap-3 mb-4">
+            <li class="d-flex gap-3"><span class="step-number">1</span><div><strong>Customer platform fee</strong><div class="text-muted small">A small percentage added on top of the product price or repair amount. You see it at checkout and on every quote.</div></div></li>
+            <li class="d-flex gap-3"><span class="step-number">2</span><div><strong>Provider commission</strong><div class="text-muted small">A percentage deducted from what the seller or repairer earns. Providers see their gross, commission and net for every sale.</div></div></li>
+            <li class="d-flex gap-3"><span class="step-number">3</span><div><strong>ReLoop total commission</strong><div class="text-muted small">The sum of the two. We show it too, so everyone knows exactly what the platform keeps.</div></div></li>
+          </ul>
+          <div id="fee-rates-table"></div>
+          <p class="small text-muted mt-2 mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i> Payments in this build are simulated. No real money is transferred and no card or bank details are collected.</p>
+        </div>
+        <div class="col-lg-7">
+          <ul class="nav nav-pills-soft mb-3" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#fee-example-market" type="button" role="tab" aria-controls="fee-example-market" aria-selected="true">Marketplace example</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#fee-example-repair" type="button" role="tab" aria-controls="fee-example-repair" aria-selected="false">Repair example</button></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="fee-example-market" role="tabpanel"></div>
+            <div class="tab-pane fade" id="fee-example-repair" role="tabpanel"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="row g-4 align-items-stretch">
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body p-4">
+            <div class="feature-icon"><i class="bi bi-person-heart" aria-hidden="true"></i></div>
+            <h2 class="h4">Join as a customer</h2>
+            <p class="text-muted">Buy and sell pre-loved products, book repairs and follow simulated deliveries from one dashboard.</p>
+            <a class="btn btn-primary" href="/register-customer.html">Create a customer account</a>
+          </div></div>
+        </div>
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body p-4">
+            <div class="feature-icon"><i class="bi bi-shop" aria-hidden="true"></i></div>
+            <h2 class="h4">List your repair workshop</h2>
+            <p class="text-muted">Receive repair requests, send transparent quotes, manage spare-part inventory and track your earnings.</p>
+            <a class="btn btn-outline-primary" href="/register-repairer.html">Register as a repairer</a>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="rl-footer"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="/assets/js/core/api.js"></script>
+<script src="/assets/js/core/ui.js"></script>
+<script src="/assets/js/core/layout.js"></script>
+<script src="/assets/js/components/cards.js"></script>
+<script src="/assets/js/components/fees.js"></script>
+<script src="/assets/js/pages/home.js"></script>
+</body>
+</html>

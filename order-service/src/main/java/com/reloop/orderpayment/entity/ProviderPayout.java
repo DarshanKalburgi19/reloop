@@ -1,7 +1,8 @@
 package com.reloop.orderpayment.entity;
 
-import com.reloop.orderpayment.enums.ProviderType;
 import com.reloop.orderpayment.enums.PayoutStatus;
+import com.reloop.orderpayment.enums.ProviderType;
+import com.reloop.orderpayment.enums.TransactionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,8 +13,9 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 
 /**
- * ONE SIMULATED payout to a seller/repairer after a successful payment.
- * Earnings are read from payout rows - never by summing raw payments.
+ * Simulated payout owed to a provider for ONE successful payment (never created for failed or cancelled payments):
+ * {@code net = gross − commission}. Refunds record the reversed portions; the provider's current earning from this
+ * payment is {@code net − reversedNet}.
  */
 @Entity
 @Table(
@@ -24,6 +26,7 @@ import java.time.LocalDateTime;
     },
     indexes = {
         @Index(name = "ix_payouts_provider", columnList = "provider_id"),
+        @Index(name = "ix_payouts_provider_account", columnList = "provider_account_id"),
         @Index(name = "ix_payouts_status", columnList = "status")
     }
 )
@@ -35,7 +38,7 @@ public class ProviderPayout extends BaseEntity {
     @Column(name = "payment_transaction_id", nullable = false)
     private Long paymentTransactionId;
 
-    /** External ID: seller Account.id or repairer RepairerProfile.id. */
+    /** Seller Account ID, or RepairerProfile ID for repairs. */
     @Column(name = "provider_id", nullable = false)
     private Long providerId;
 
@@ -43,19 +46,35 @@ public class ProviderPayout extends BaseEntity {
     @Column(name = "provider_type", nullable = false, length = 20)
     private ProviderType providerType;
 
-    /** External account of the provider's login (product-service). */
+    /** product-service Account ID of the provider (dashboards and access checks use this). */
     @Column(name = "provider_account_id")
     private Long providerAccountId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type", length = 30)
+    private TransactionType transactionType;
+
+    /** Provider's gross amount (the base price). */
     @Column(name = "gross_amount_paise", nullable = false)
     private Long grossAmountPaise;
 
+    /** ReLoop commission deducted from the gross. */
     @Column(name = "commission_paise", nullable = false)
     private Long commissionPaise;
 
-    /** gross - commission (e.g. 100000 - 2000 = 98000 paise). */
+    /** gross − commission. */
     @Column(name = "net_amount_paise", nullable = false)
     private Long netAmountPaise;
+
+    @Column(name = "refunded_gross_paise", nullable = false)
+    private Long refundedGrossPaise = 0L;
+
+    @Column(name = "reversed_commission_paise", nullable = false)
+    private Long reversedCommissionPaise = 0L;
+
+    /** Net amount taken back by refunds (refundedGross − reversedCommission). */
+    @Column(name = "reversed_net_paise", nullable = false)
+    private Long reversedNetPaise = 0L;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "INR";
@@ -68,6 +87,11 @@ public class ProviderPayout extends BaseEntity {
     private LocalDateTime paidAt;
 
     public ProviderPayout() {
+    }
+
+    /** What the provider currently earns from this payment. */
+    public long currentNetPaise() {
+        return netAmountPaise - reversedNetPaise;
     }
 
     public String getPayoutReference() {
@@ -110,6 +134,14 @@ public class ProviderPayout extends BaseEntity {
         this.providerAccountId = providerAccountId;
     }
 
+    public TransactionType getTransactionType() {
+        return transactionType;
+    }
+
+    public void setTransactionType(TransactionType transactionType) {
+        this.transactionType = transactionType;
+    }
+
     public Long getGrossAmountPaise() {
         return grossAmountPaise;
     }
@@ -132,6 +164,30 @@ public class ProviderPayout extends BaseEntity {
 
     public void setNetAmountPaise(Long netAmountPaise) {
         this.netAmountPaise = netAmountPaise;
+    }
+
+    public Long getRefundedGrossPaise() {
+        return refundedGrossPaise;
+    }
+
+    public void setRefundedGrossPaise(Long refundedGrossPaise) {
+        this.refundedGrossPaise = refundedGrossPaise;
+    }
+
+    public Long getReversedCommissionPaise() {
+        return reversedCommissionPaise;
+    }
+
+    public void setReversedCommissionPaise(Long reversedCommissionPaise) {
+        this.reversedCommissionPaise = reversedCommissionPaise;
+    }
+
+    public Long getReversedNetPaise() {
+        return reversedNetPaise;
+    }
+
+    public void setReversedNetPaise(Long reversedNetPaise) {
+        this.reversedNetPaise = reversedNetPaise;
     }
 
     public String getCurrency() {

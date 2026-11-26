@@ -1,14 +1,11 @@
 package com.reloop.orderpayment.enums;
 
-/**
- * RefundReason - fixed status/choice enum (stored as string, never ordinal).
- *
- * <p>Why a refund was issued.</p>
- */
+/** Why a simulated refund was issued. */
 public enum RefundReason {
-
     ORDER_CANCELLED,
     DISPUTED_ORDER,
-    CUSTOMER_REQUEST
-
+    CUSTOMER_REQUEST,
+    ITEM_NOT_AS_DESCRIBED,
+    REPAIR_NOT_COMPLETED,
+    OTHER
 }

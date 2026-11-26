@@ -1,0 +1,9 @@
+{
+  "orderReference": "ORD-2026-1006",
+  "transactionId": "TXN-20261125-ABCDEFGHJK",
+  "refundReference": "RFD-20261125-MNPQRSTUVW",
+  "refundAmountPaise": 25500,
+  "totalRefundedPaise": 25500,
+  "fullyRefunded": false,
+  "reason": "ITEM_NOT_AS_DESCRIBED"
+}

@@ -13,4 +13,10 @@ public interface OrderServiceClient {
     QuoteView approveQuote(Long quoteId, QuoteDecisionCommand command);
 
     QuoteView rejectQuote(Long quoteId, QuoteDecisionCommand command);
+
+    /**
+     * Reads a marketplace order ({@code GET /api/internal/orders/{id}}) for store-to-customer delivery tracking.
+     * An unknown order surfaces as {@link com.reloop.repair.exception.OrderServiceException} with status 404.
+     */
+    MarketplaceOrderView getOrder(Long orderId);
 }

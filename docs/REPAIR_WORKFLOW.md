@@ -119,8 +119,14 @@ The allowed moves are listed in one table, `RepairTransitions`. `RepairAction` m
 | `POST /api/internal/repair-quotes/{id}/approve` | repair-service | `SENT` → `APPROVED`. Idempotent. 409 if superseded, rejected or expired (`reloop.quotes.valid-days`, default 7) |
 | `POST /api/internal/repair-quotes/{id}/reject` | repair-service | `SENT` → `REJECTED`. Idempotent |
 | `GET /api/internal/repair-quotes/{id}` | repair-service | read |
-| `POST /api/payments/simulate` | CUSTOMER (quote owner) | `{"repairQuoteId", "method"?: UPI\|CARD\|NET_BANKING\|WALLET, "outcome"?: SUCCESS\|FAILURE}` |
-| `GET /api/payments/{transactionId}` | CUSTOMER (payer) | payment + commission + payout references |
+| `POST /api/payments/simulate` | CUSTOMER (quote owner) | `{"repairQuoteId", "method": UPI\|CARD\|NET_BANKING\|WALLET, "outcome"?: SUCCESS\|FAILED\|CANCELLED, "amountPaise": totalPayablePaise}`. A wrong amount gets 422. Optional `Idempotency-Key` header. Full rules: [PAYMENTS.md](PAYMENTS.md) |
+| `GET /api/transactions/{transactionId}` (also `/api/payments/{transactionId}`) | payer or repairer | Payment with commission, payout and refund details, plus a receipt link |
+
+Short aliases in repair-service: `POST /api/repairs/{id}/quote` (REPAIRER) sends the first quote after
+inspection, or a revision while the quote is unpaid. `POST /api/repairs/{id}/approve` (CUSTOMER) approves the
+current quote. They follow the same rules and give the same responses as the `/api/repair-requests/{id}/…`
+endpoints above. Quotes now also send the repairer's **account** id (`repairerAccountId`) to order-service, so
+payouts and earnings are keyed by the account that signs in (audit issue C-9).
 
 ### Payment sequence
 
@@ -132,10 +138,10 @@ customer ──POST /api/payments/simulate──► order-service
                                            │      {quoteId, paymentTransactionId, transactionId, amountPaise}
                                            │◄───────────────── 200 (request now PAID)  or 409 / error
                                            │ commit, or ROLL BACK everything if repair-service refused or was unreachable
-customer ◄──201 PaymentView────────────────┘
+customer ◄──201 TransactionView────────────┘
 ```
 
-Because the callback runs inside order-service's database transaction, a payment that repair-service refuses (for example, because the request was cancelled meanwhile) or can't receive leaves **no** payment, commission or payout rows behind. A simulated `FAILURE` only records a FAILURE transaction, and the quote stays payable.
+Because the callback runs inside order-service's database transaction, a payment that repair-service refuses (for example, because the request was cancelled meanwhile) or can't receive leaves **no** payment, commission or payout rows behind. A simulated `FAILED` or `CANCELLED` outcome only records that attempt, with no commission, payout or ledger lines, and the quote stays payable.
 
 Service-to-service calls use the shared `reloop.internal.api-key`, compared in constant time. Base URLs are `reloop.services.order.base-url` and `reloop.services.repair.base-url` (or the `RELOOP_ORDER_SERVICE_URL` environment variable). Timeouts are 2 s to connect and 5 s to read.
 
@@ -165,7 +171,8 @@ QUOTE=$(curl -s -X POST localhost:8083/api/repair-requests/$ID/quote -H "$R" -H 
 
 # 4. customer approves and pays (simulated)
 curl -s -X POST localhost:8083/api/repair-requests/$ID/quote/approve -H "Authorization: Bearer $CUST"
-curl -s localhost:8082/api/payments/simulate -H "Authorization: Bearer $CUST" -H "$J" -d "{\"repairQuoteId\":$QUOTE}"
+curl -s localhost:8082/api/payments/simulate -H "Authorization: Bearer $CUST" -H "$J" \
+  -d "{\"repairQuoteId\":$QUOTE,\"method\":\"UPI\",\"amountPaise\":153000}"
 
 # 5. repairer works and completes; anyone involved can read the timeline
 curl -s -X POST localhost:8083/api/repair-requests/$ID/progress -H "$R"
@@ -182,7 +189,7 @@ curl -s localhost:8083/api/repair-requests/$ID/history -H "Authorization: Bearer
 | repair-service | `service/RepairTransitionsTest` | state-machine invariants, `allowedActions` per viewer |
 | repair-service | `client/HttpOrderServiceClientTest` | REST contract to order-service (MockRestServiceServer), error mapping 409/502/503 |
 | order-service | `repairquote/RepairQuoteApiTest` | key check, fee freeze, revisions supersede, approve/reject rules, expiry |
-| order-service | `repairquote/PaymentApiTest` | pays only an APPROVED quote, once, as its owner; frozen rates; separate commission and payout; rollback when repair-service refuses or is down; simulated failure |
+| order-service | `repairquote/PaymentApiTest` | pays only an APPROVED quote, once, as its owner; frozen rates; separate commission and payout; rollback when repair-service refuses or is down; failed and cancelled attempts; incorrect amount (422) |
 | order-service | `service/FeeCalculatorTest`, `client/HttpRepairServiceClientTest` | fee arithmetic and rounding; REST contract to repair-service |
 
 ## Not yet

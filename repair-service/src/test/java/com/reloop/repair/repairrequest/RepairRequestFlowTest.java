@@ -164,6 +164,37 @@ class RepairRequestFlowTest {
                         .formatted(quoteId, paymentId, paymentId, amountPaise)));
     }
 
+    /* ─────────────────────── /api/repairs short routes ─────────────────────── */
+
+    @Test
+    void shortRoutesQuoteReviseAndApproveLikeTheWorkflowEndpoints() throws Exception {
+        long id = inspected();
+        var quote = post("/api/repairs/{id}/quote", id).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount))
+                .contentType(MediaType.APPLICATION_JSON);
+        mvc.perform(quote.content(quoteBody("1000.00"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("QUOTED"))
+                .andExpect(jsonPath("$.quote.revision").value(1))
+                .andExpect(jsonPath("$.quote.totalPayable").value(1020.00));
+        // the same route revises an existing unpaid quote
+        mvc.perform(post("/api/repairs/{id}/quote", id).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount))
+                        .contentType(MediaType.APPLICATION_JSON).content(quoteBody("1200.00")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.quote.revision").value(2));
+        verify(orderService).createQuote(org.mockito.ArgumentMatchers.argThat(cmd -> cmd.repairRequestId() == id
+                && cmd.baseAmountPaise() == 120_000L && Long.valueOf(repairerAccount).equals(cmd.repairerAccountId())));
+
+        // customers can't quote, repairers can't approve
+        mvc.perform(post("/api/repairs/{id}/quote", id).header(HttpHeaders.AUTHORIZATION, customer(customerAccount))
+                        .contentType(MediaType.APPLICATION_JSON).content(quoteBody("1.00")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/repairs/{id}/approve", id).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount)))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(post("/api/repairs/{id}/approve", id).header(HttpHeaders.AUTHORIZATION, customer(customerAccount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"));
+        mvc.perform(post("/api/repairs/{id}/approve", id)).andExpect(status().isUnauthorized());
+    }
+
     /* ───────────────────────────── happy path ───────────────────────────── */
 
     @Test
@@ -201,7 +232,7 @@ class RepairRequestFlowTest {
                 .andExpect(jsonPath("$.quote.totalPayable").value(1530.00))
                 .andExpect(jsonPath("$.quote.estimatedDays").value(2));
         verify(orderService).createQuote(new CreateQuoteCommand(id, JsonPath.read(created, "$.requestNumber"), profileId,
-                customerAccount, 150_000L, "Replace OLED panel and adhesive"));
+                customerAccount, 150_000L, "Replace OLED panel and adhesive", repairerAccount));
 
         long quoteId = latestQuoteId(id);
         asCustomer(id, "quote/approve", note("Go ahead")).andExpect(status().isOk())
@@ -304,7 +335,149 @@ class RepairRequestFlowTest {
         confirmPayment(q[0], q[1], 71, 153_000).andExpect(status().isOk());
         confirmPayment(q[0], q[1], 71, 153_000).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PAID"))
                 .andExpect(jsonPath("$.history", hasSize(7)));
-        confirmPayment(q[0], q[1], 72, 153_000).andExpect(status().isConflict()); // a second, different payment
+        // order-service settles one payment per quote, so a confirmation with a new transaction for the SAME quote is
+        // a retry after order-service rolled back (e.g. it timed out waiting for us): adopt the newer reference
+        confirmPayment(q[0], q[1], 72, 153_000).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.paymentTransactionId").value(72))
+                .andExpect(jsonPath("$.transactionId").value("PAY-20261125-TEST000072"))
+                .andExpect(jsonPath("$.history", hasSize(8)))
+                .andExpect(jsonPath("$.history[7].note", containsString("Payment reference updated")));
+        confirmPayment(q[0], q[1], 72, 153_000).andExpect(status().isOk()).andExpect(jsonPath("$.history", hasSize(8)));
+        // but a different amount or another quote is still refused
+        confirmPayment(q[0], q[1], 73, 150_000).andExpect(status().isConflict());
+        confirmPayment(q[0], q[1] + 999, 74, 153_000).andExpect(status().isConflict());
+    }
+
+    /* ───────────────────────────── payment events (order-service) ───────────────────────────── */
+
+    private ResultActions paymentEvent(long id, String json, String key) throws Exception {
+        var request = post("/api/internal/repair-requests/{id}/payment-events", id)
+                .contentType(MediaType.APPLICATION_JSON).content(json);
+        if (key != null) {
+            request.header("X-Internal-Api-Key", key);
+        }
+        return mvc.perform(request);
+    }
+
+    private static String event(String eventId, String type, long quoteId, String txn, long amount, long refunded) {
+        return ("{\"eventId\":\"%s\",\"type\":\"%s\",\"quoteId\":%d,\"paymentTransactionId\":1,\"transactionId\":\"%s\","
+                + "\"amountPaise\":%d,\"refundedAmountPaise\":%d,\"reason\":\"simulated\"}")
+                .formatted(eventId, type, quoteId, txn, amount, refunded);
+    }
+
+    /** Approved and paid with payment id {@code paymentId} (TXN reference PAY-20261125-TEST%06d). */
+    private long[] paid(String amount, long paymentId, long totalPaise) throws Exception {
+        long[] q = quoted(amount);
+        asCustomer(q[0], "quote/approve", null).andExpect(status().isOk());
+        confirmPayment(q[0], q[1], paymentId, totalPaise).andExpect(status().isOk());
+        return q;
+    }
+
+    @Test
+    void failedPaymentIsShownButTheQuoteStaysPayable() throws Exception {
+        long[] q = quoted("1000");
+        asCustomer(q[0], "quote/approve", null).andExpect(status().isOk());
+
+        paymentEvent(q[0], event("TXN-F1:FAILED", "FAILED", q[1], "TXN-F1", 102_000, 0), INTERNAL_KEY)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"))
+                .andExpect(jsonPath("$.paymentStatus").value("FAILED"))
+                .andExpect(jsonPath("$.lastPaymentFailure").value("simulated"))
+                .andExpect(jsonPath("$.allowedActions", containsInAnyOrder("pay", "cancel")))
+                .andExpect(jsonPath("$.history", hasSize(7)))
+                .andExpect(jsonPath("$.history[6].note", containsString("TXN-F1 failed")));
+        // the same event again changes nothing
+        paymentEvent(q[0], event("TXN-F1:FAILED", "FAILED", q[1], "TXN-F1", 102_000, 0), INTERNAL_KEY)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.history", hasSize(7)));
+        paymentEvent(q[0], event("TXN-C1:CANCELLED", "CANCELLED", q[1], "TXN-C1", 102_000, 0), INTERNAL_KEY)
+                .andExpect(jsonPath("$.paymentStatus").value("CANCELLED"));
+
+        // both sides see it
+        mvc.perform(get("/api/repair-requests/{id}", q[0]).header(HttpHeaders.AUTHORIZATION, repairer(repairerAccount)))
+                .andExpect(jsonPath("$.paymentStatus").value("CANCELLED"));
+        mvc.perform(get("/api/repair-requests/mine").header(HttpHeaders.AUTHORIZATION, customer(customerAccount)))
+                .andExpect(jsonPath("$.content[0].paymentStatus").value("CANCELLED"));
+
+        // a later success clears the failure; a stale failure can't override it
+        confirmPayment(q[0], q[1], 81, 102_000).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.paymentStatus").value("PAID"))
+                .andExpect(jsonPath("$.transactionId").value("PAY-20261125-TEST000081"))
+                .andExpect(jsonPath("$.lastPaymentFailure").doesNotExist());
+        paymentEvent(q[0], event("TXN-F2:FAILED", "FAILED", q[1], "TXN-F2", 102_000, 0), INTERNAL_KEY)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.paymentStatus").value("PAID"));
+    }
+
+    @Test
+    void partialRefundKeepsTheJobAndFullRefundClosesIt() throws Exception {
+        long[] q = paid("1500", 91, 153_000);
+        String txn = "PAY-20261125-TEST000091";
+        asRepairer(q[0], "progress", null).andExpect(status().isOk());
+
+        paymentEvent(q[0], event(txn + ":REFUND:51000", "PARTIALLY_REFUNDED", q[1], txn, 153_000, 51_000), INTERNAL_KEY)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.paymentStatus").value("PARTIALLY_REFUNDED"))
+                .andExpect(jsonPath("$.refundedAmountPaise").value(51000));
+
+        paymentEvent(q[0], event(txn + ":REFUND:153000", "REFUNDED", q[1], txn, 153_000, 153_000), INTERNAL_KEY)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"))
+                .andExpect(jsonPath("$.refundedAmountPaise").value(153000))
+                .andExpect(jsonPath("$.closeReason", containsString("refunded")))
+                .andExpect(jsonPath("$.closedAt", notNullValue()))
+                .andExpect(jsonPath("$.allowedActions", hasSize(0)));
+        // duplicate delivery and a replayed older event are harmless
+        paymentEvent(q[0], event(txn + ":REFUND:153000", "REFUNDED", q[1], txn, 153_000, 153_000), INTERNAL_KEY)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        asRepairer(q[0], "complete", note("done")).andExpect(status().isConflict());
+
+        mvc.perform(get("/api/repair-requests/{id}/history", q[0]).header(HttpHeaders.AUTHORIZATION, customer(customerAccount)))
+                .andExpect(jsonPath("$[*].toStatus", hasItem("CANCELLED")))
+                .andExpect(jsonPath("$[?(@.toStatus == 'CANCELLED')].actor", contains("SYSTEM")))
+                .andExpect(jsonPath("$[?(@.toStatus == 'CANCELLED')].note", contains(containsString("fully refunded"))));
+    }
+
+    @Test
+    void refundAfterCompletionKeepsTheCompletedStatus() throws Exception {
+        long[] q = paid("500", 92, 51_000);
+        String txn = "PAY-20261125-TEST000092";
+        asRepairer(q[0], "progress", null).andExpect(status().isOk());
+        asRepairer(q[0], "complete", note("Fixed")).andExpect(status().isOk());
+
+        paymentEvent(q[0], event(txn + ":REFUND:51000", "REFUNDED", q[1], txn, 51_000, 51_000), INTERNAL_KEY)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
+    }
+
+    @Test
+    void refundMustNameThePaymentTheRequestWasPaidWith() throws Exception {
+        long[] q = quoted("700");
+        paymentEvent(q[0], event("TXN-X:REFUND:100", "REFUNDED", q[1], "TXN-X", 71_400, 71_400), INTERNAL_KEY)
+                .andExpect(status().isConflict());
+        asCustomer(q[0], "quote/approve", null).andExpect(status().isOk());
+        confirmPayment(q[0], q[1], 93, 71_400).andExpect(status().isOk());
+        paymentEvent(q[0], event("TXN-OTHER:REFUND:100", "PARTIALLY_REFUNDED", q[1], "TXN-OTHER", 71_400, 100), INTERNAL_KEY)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("PAY-20261125-TEST000093")));
+    }
+
+    @Test
+    void paymentEventsNeedTheKeyAndAValidBody() throws Exception {
+        long id = submitted();
+        String body = event("TXN-K:FAILED", "FAILED", 1, "TXN-K", 100, 0);
+        paymentEvent(id, body, null).andExpect(status().isUnauthorized());
+        paymentEvent(id, body, "wrong").andExpect(status().isUnauthorized());
+        paymentEvent(id, "{\"type\":\"FAILED\",\"quoteId\":1,\"transactionId\":\"TXN-K\",\"amountPaise\":100,"
+                + "\"refundedAmountPaise\":0}", INTERNAL_KEY).andExpect(status().isBadRequest());
+        paymentEvent(id, body.replace("\"FAILED\"", "\"EXPLODED\""), INTERNAL_KEY).andExpect(status().isBadRequest());
+        paymentEvent(999_999, body, INTERNAL_KEY).andExpect(status().isNotFound());
+        // a failure reported while the request isn't awaiting payment is recorded as a no-op
+        paymentEvent(id, body, INTERNAL_KEY).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REQUESTED"))
+                .andExpect(jsonPath("$.paymentStatus").doesNotExist());
     }
 
     @Test

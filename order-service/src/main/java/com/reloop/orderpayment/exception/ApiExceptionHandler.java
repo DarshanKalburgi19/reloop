@@ -97,6 +97,35 @@ public class ApiExceptionHandler {
                 .body(body(HttpStatus.CONFLICT, "Conflicts with existing data; reload and try again", req));
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<Map<String, Object>> badRequest(BadRequestException ex, HttpServletRequest req) {
+        return badRequest(ex.fieldErrors(), req);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> forbidden(ForbiddenException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body(HttpStatus.FORBIDDEN, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(UnprocessableException.class)
+    public ResponseEntity<Map<String, Object>> unprocessable(UnprocessableException ex, HttpServletRequest req) {
+        Map<String, Object> body = body(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), req);
+        body.putAll(ex.getDetails());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
+
+    @ExceptionHandler(ProductServiceException.class)
+    public ResponseEntity<Map<String, Object>> productService(ProductServiceException ex, HttpServletRequest req) {
+        HttpStatus status = HttpStatus.valueOf(ex.getStatus());
+        return ResponseEntity.status(status).body(body(status, ex.getMessage(), req));
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
+    public ResponseEntity<Map<String, Object>> missingHeader(org.springframework.web.bind.MissingRequestHeaderException ex,
+                                                             HttpServletRequest req) {
+        return badRequest(Map.of(ex.getHeaderName(), "header is required"), req);
+    }
+
     @ExceptionHandler(RepairServiceException.class)
     public ResponseEntity<Map<String, Object>> repairService(RepairServiceException ex, HttpServletRequest req) {
         HttpStatus status = HttpStatus.valueOf(ex.getStatus());

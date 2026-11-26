@@ -3,6 +3,7 @@ package com.reloop.product.seed;
 import com.reloop.product.dto.product.CreateProductRequest;
 import com.reloop.product.dto.product.ProductResponse;
 import com.reloop.product.dto.product.UpdateProductRequest;
+import com.reloop.product.dto.sale.ProductReservationRequest;
 import com.reloop.product.entity.Account;
 import com.reloop.product.entity.City;
 import com.reloop.product.entity.Store;
@@ -12,6 +13,7 @@ import com.reloop.product.repository.AccountRepository;
 import com.reloop.product.repository.CityRepository;
 import com.reloop.product.repository.ProductRepository;
 import com.reloop.product.repository.StoreRepository;
+import com.reloop.product.service.ProductSaleService;
 import com.reloop.product.service.ProductService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -127,15 +129,20 @@ public class DemoProductSeeder implements ApplicationRunner {
                     ProductCategory.SPORTS_TOYS, "2200.00", ProductCondition.FAIR, "Gandhinagar",
                     "Sector 11, near the GH-5 circle", false));
 
+    /** Order reference of the seeded sale (there is no order-service order behind it). */
+    static final String DEMO_SALE_REFERENCE = "DEMO-SEED-SALE-1";
+
     private final ProductService productService;
+    private final ProductSaleService saleService;
     private final ProductRepository products;
     private final AccountRepository accounts;
     private final CityRepository cities;
     private final StoreRepository stores;
 
-    public DemoProductSeeder(ProductService productService, ProductRepository products, AccountRepository accounts,
-                             CityRepository cities, StoreRepository stores) {
+    public DemoProductSeeder(ProductService productService, ProductSaleService saleService, ProductRepository products,
+                             AccountRepository accounts, CityRepository cities, StoreRepository stores) {
         this.productService = productService;
+        this.saleService = saleService;
         this.products = products;
         this.accounts = accounts;
         this.cities = cities;
@@ -174,7 +181,13 @@ public class DemoProductSeeder implements ApplicationRunner {
             productService.update(asha.get().getId(), soldDemo.id(), new UpdateProductRequest(
                     cooker.title(), cooker.description(), cooker.category(), new BigDecimal("1100.00"),
                     cooker.condition(), cooker.city(), cooker.pickupLocation(), null, null, null));
-            productService.purchase(karan.get().getId(), soldDemo.id());
+            // Same reserve → confirm-sale path order-service uses. The legacy one-step purchase is disabled
+            // outside tests (reloop.marketplace.direct-purchase-enabled=false), and calling it here crashed
+            // startup on a fresh database.
+            ProductReservationRequest sale = new ProductReservationRequest(karan.get().getId(), DEMO_SALE_REFERENCE,
+                    null, null);
+            saleService.reserve(soldDemo.id(), sale);
+            saleService.confirmSale(soldDemo.id(), sale);
         }
         log.warn("Seeded {} demo listings across Ahmedabad, Surat, Vadodara, Rajkot and Gandhinagar", LISTINGS.size());
     }

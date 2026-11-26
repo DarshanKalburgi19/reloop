@@ -20,7 +20,8 @@ history that follows the item across sellers.
 | `PUT` | `/api/products/{id}` | CUSTOMER, seller only | Edit own listing (full replacement); can also deactivate/reactivate |
 | `DELETE` | `/api/products/{id}` | CUSTOMER, seller only | Deactivate own listing (soft delete) → `204` |
 | `GET` | `/api/products/mine?page=&size=` | CUSTOMER | Own listings in every status, newest first |
-| `POST` | `/api/products/{id}/purchase` | CUSTOMER | Buy another customer's ACTIVE listing |
+| `POST` | `/api/products/{id}/purchase` | CUSTOMER | Legacy direct purchase without fees. **410 Gone** unless `RELOOP_DIRECT_PURCHASE_ENABLED=true`; buy through order-service instead ([PAYMENTS.md](PAYMENTS.md)) |
+| `POST` | `/api/internal/products/{id}/reserve` · `confirm-sale` · `release` | order-service (`X-Internal-Api-Key`) | ACTIVE → RESERVED for one order; RESERVED → SOLD (passport moves to the buyer); or back to ACTIVE. Idempotent per order reference |
 
 Anonymous visitors can browse and view. REPAIRER accounts can browse and view, but can't
 list or buy (`403`). Calls without a token to CUSTOMER endpoints get `401`.
@@ -98,9 +99,11 @@ each `content` item is a compact card with `thumbnailUrl`, `storeName` and `pass
 
 `POST /api/products/{id}/purchase` marks the listing `SOLD`, records the buyer and `soldAt`,
 transfers the passport to the buyer and appends a `SOLD` event. It returns `productId`, `sellerId`,
-`buyerId`, `price`, `passportCode`, `purchasedAt`. **No payment is taken in this phase**: orders,
-simulated payments, the 2% platform fee and commissions are added by order-service in the
-orders & payments phase.
+`buyerId`, `price`, `passportCode`, `purchasedAt`. It takes no payment and charges no fees, so it is now
+**disabled by default** (410). The real flow is `POST /api/orders` on order-service, which reserves the listing
+(`RESERVED`, history event `RESERVED`). A successful simulated payment then confirms the sale (`SOLD`, passport
+transferred). An unpaid order that is cancelled or expires releases the listing again (`RESERVATION_RELEASED`).
+Sellers can't edit a `RESERVED` listing (409). See [PAYMENTS.md](PAYMENTS.md).
 
 ## 3. Product passport
 
@@ -179,6 +182,8 @@ curl -s -X PUT $B/api/products/$ID -H "Authorization: Bearer $ASHA" -H 'Content-
 curl -s $B/api/products/$ID
 curl -s $B/api/products/$ID/passport
 
+# Legacy direct purchase. It only works with RELOOP_DIRECT_PURCHASE_ENABLED=true (otherwise 410);
+# normally buy through order-service (docs/PAYMENTS.md §6).
 # Asha can't buy her own listing (403); Nisha can (200); a second purchase is refused (409)
 curl -si -X POST $B/api/products/$ID/purchase -H "Authorization: Bearer $ASHA"
 curl -s  -X POST $B/api/products/$ID/purchase -H "Authorization: Bearer $NISHA"

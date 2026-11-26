@@ -50,7 +50,8 @@ public final class RepairRequestMapper {
                 r.getRepairService() == null ? null : r.getRepairService().getName(),
                 r.getItemCategory(), r.getItemDescription(), r.getProblemDescription(), List.copyOf(r.getImageUrls()),
                 toRepairMethod(r.getDeliveryMode()), deliveryInstructions(r),
-                r.getCustomerNotes(), r.getInspectionNotes(), toQuote(r), r.getPaymentTransactionId(), r.getCloseReason(),
+                r.getCustomerNotes(), r.getInspectionNotes(), toQuote(r), r.getPaymentTransactionId(), r.getPaymentReference(),
+                r.getPaymentStatus(), r.getRefundedAmountPaise(), r.getLastPaymentFailure(), r.getCloseReason(),
                 RepairAction.available(r.getStatus(), viewerIsRepairer),
                 r.getCreatedAt(), r.getUpdatedAt(), r.getAcceptedAt(), r.getInspectedAt(), r.getQuotedAt(),
                 r.getApprovedAt(), r.getPaidAt(), r.getInProgressAt(), r.getCompletedAt(), r.getClosedAt(),
@@ -63,7 +64,7 @@ public final class RepairRequestMapper {
                 r.getRepairerProfile().getId(), r.getRepairerProfile().getBusinessName(), r.getItemCategory(),
                 r.getItemDescription(), toRepairMethod(r.getDeliveryMode()),
                 q == null || q.getTotalPayablePaise() == null ? null : Money.toRupees(q.getTotalPayablePaise()),
-                r.getCreatedAt(), r.getUpdatedAt());
+                r.getCreatedAt(), r.getUpdatedAt(), r.getPaymentStatus(), r.getPaymentReference());
     }
 
     public static HistoryEntryResponse toHistory(RepairStatusHistory h) {

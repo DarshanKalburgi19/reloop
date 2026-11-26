@@ -8,7 +8,7 @@ import java.util.Date;
 import javax.crypto.SecretKey;
 
 /** Mints JWTs like product-service does, signed with the test secret from test application.properties. */
-final class TestTokens {
+public final class TestTokens {
 
     static final String SECRET = "test-only-jwt-secret-0123456789-abcdefghijklmnop";
     static final String ISSUER = "reloop-product-service";
@@ -16,11 +16,11 @@ final class TestTokens {
     private TestTokens() {
     }
 
-    static String customer(long accountId) {
+    public static String customer(long accountId) {
         return bearer(accountId, "CUSTOMER");
     }
 
-    static String repairer(long accountId) {
+    public static String repairer(long accountId) {
         return bearer(accountId, "REPAIRER");
     }
 

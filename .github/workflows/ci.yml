@@ -81,3 +81,101 @@ jobs:
             -f description="$REPORT" \
             -f context="tests/${{ matrix.service }}" \
             --jq '.context + " -> " + .state + ": " + .description' || true
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Static checks (syntax, links, CSP, SRI, proxy routes)
+        working-directory: frontend
+        run: npm test
+
+      - name: Dev server smoke test (mock backend)
+        working-directory: frontend
+        run: |
+          PORT=8080 node server.js --mock > server.log 2>&1 &
+          for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz >/dev/null && break; sleep 0.5; done
+          set -e
+          curl -fs http://localhost:8080/healthz
+          for p in / /marketplace.html /repairers.html /login.html /customer/ /repairer/ /assets/css/reloop.css /assets/js/core/api.js; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$p"); echo "$p -> $code"; [ "$code" = 200 ]
+          done
+          curl -fs http://localhost:8080/api/fee-rates | grep -q REPAIR_BOOKING
+          TOKEN=$(curl -fs -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"customer.demo@reloop.local","password":"ReLoopDemo#Cust2026"}' | node -pe 'JSON.parse(require("fs").readFileSync(0)).accessToken')
+          curl -fs http://localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep -q CUSTOMER
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/internal/orders/1); echo "internal -> $code"; [ "$code" = 404 ]
+          curl -sI http://localhost:8080/ | grep -qi "content-security-policy"
+
+      - name: End-to-end scenarios against the mock backend
+        run: |
+          (cd frontend && PORT=8081 node server.js --mock > e2e-mock.log 2>&1 &)
+          for i in $(seq 1 20); do curl -fs http://localhost:8081/healthz >/dev/null && break; sleep 0.5; done
+          BASE_URL=http://localhost:8081 bash scripts/e2e/run-all.sh
+
+  e2e:
+    name: End-to-end (real services)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Start the stack (3 services + frontend proxy)
+        env:
+          E2E_LOG_DIR: ${{ runner.temp }}/reloop-e2e
+        run: |
+          set -o pipefail
+          mkdir -p "$E2E_LOG_DIR"
+          bash scripts/e2e/start-stack.sh --build 2>&1 | tee "$E2E_LOG_DIR/00-start-stack.out"
+
+      - name: Run the four scenarios (sale, repair, failed payment, refund)
+        env:
+          E2E_LOG_DIR: ${{ runner.temp }}/reloop-e2e
+        run: |
+          set -o pipefail
+          bash scripts/e2e/run-all.sh 2>&1 | tee "$E2E_LOG_DIR/01-scenarios.out"
+
+      # Logs are also turned into check-run annotations, so a failure is readable through the GitHub API
+      # (gh api repos/<repo>/check-runs/<job id>/annotations) even where log downloads are unavailable.
+      - name: Service logs
+        if: failure()
+        run: |
+          for f in "${{ runner.temp }}"/reloop-e2e/*; do
+            [ -f "$f" ] || continue
+            echo "::group::$(basename "$f")"; tail -n 300 "$f"; echo "::endgroup::"
+            case "$f" in
+              *.out) lines=$(grep -E "FAIL|ABORT|did not|failed|error" "$f" | tail -n 40; echo '--- tail ---'; tail -n 25 "$f") ;;
+              *)     lines=$(grep -E "ERROR|WARN|Exception|Caused by|APPLICATION FAILED" "$f" | tail -n 40) ;;
+            esac
+            [ -n "$lines" ] || continue
+            esc=$(printf '%s\n' "$lines" | sed -e 's/%/%25/g' -e 's/\r//g' -e 's/\x1b\[[0-9;]*m//g' | awk '{printf "%s%%0A", $0}' | cut -c1-7000)
+            echo "::error title=e2e $(basename "$f")::${esc}"
+          done
+
+      - name: Stop the stack
+        if: always()
+        env:
+          E2E_LOG_DIR: ${{ runner.temp }}/reloop-e2e
+        run: bash scripts/e2e/start-stack.sh --stop

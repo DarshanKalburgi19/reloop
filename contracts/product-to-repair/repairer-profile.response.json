@@ -1,0 +1,18 @@
+{
+  "id": 1,
+  "accountExternalId": 4,
+  "businessName": "Ravi Mobile Care",
+  "specialties": "Phones, tablets",
+  "phone": "+91 98250 12345",
+  "addressLine": "12 CG Road, Navrangpura",
+  "city": "Ahmedabad",
+  "pincode": "380009",
+  "latitude": 23.0338,
+  "longitude": 72.5585,
+  "serviceHours": "Mon-Sat 10:00-19:00",
+  "acceptsInPerson": true,
+  "acceptsPickupDrop": true,
+  "acceptsShipping": false,
+  "verificationStatus": "UNVERIFIED",
+  "status": "ACTIVE"
+}

@@ -4,7 +4,7 @@
 products and book repairs from independent repair professionals.
 
 This repository is a **monorepo** containing three independently runnable Spring Boot
-microservices plus (later) the shared frontend.
+microservices plus the shared web frontend (`frontend/`, see [docs/FRONTEND.md](docs/FRONTEND.md)).
 
 ## Services
 
@@ -12,7 +12,7 @@ microservices plus (later) the shared frontend.
 |---|---|---|---|---|---|
 | Product & Account | 8081 | `product-service/` | `com.reloop.product` | PC1 | Registration, login, customer/repairer account separation, product listings, customer dashboard |
 | Order & Payment | 8082 | `order-service/` | `com.reloop.orderpayment` | PC2 | Purchase orders, repair quotes/approvals, simulated payments, commission ledger |
-| Repair & Tracking | 8083 | `repair-service/` | `com.reloop.repair` | PC3 | Repairer profiles, locations, repair booking/status, inventory, repairer dashboard |
+| Repair & Tracking | 8083 | `repair-service/` | `com.reloop.repair` | PC3 | Repairer profiles, locations, repair booking/status, inventory, simulated delivery tracking, repairer dashboard |
 
 **Account rule:** there are exactly two account types — `CUSTOMER` and `REPAIRER`.
 They are registered through separate flows; a customer can never convert an account
@@ -73,6 +73,13 @@ curl http://localhost:8082/actuator/health
 curl http://localhost:8083/actuator/health
 ```
 
+Or start everything at once (the three services plus the frontend proxy on http://localhost:8080) and wait until
+the demo accounts are ready:
+
+```bash
+scripts/e2e/start-stack.sh          # --build rebuilds the jars, --fresh starts with clean databases, --stop stops
+```
+
 ## Build and test everything
 
 ```bash
@@ -81,7 +88,15 @@ mvn -B -ntp -f order-service/pom.xml verify
 mvn -B -ntp -f repair-service/pom.xml verify
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every push.
+End-to-end scenarios across all services (marketplace sale, repair, failed payment, refund). They run against the
+running stack, or against the mock (`cd frontend && npm run start:mock`):
+
+```bash
+scripts/e2e/run-all.sh              # BASE_URL defaults to http://localhost:8080
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the three builds, the frontend checks, the e2e scenarios against
+the mock, and the e2e scenarios against the real services on every push ([INTEGRATION](docs/INTEGRATION.md)).
 
 ## Project status
 
@@ -107,8 +122,39 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   Quantities can never go negative (row locks, CHECK constraint), and only the owner can change them.
   Low-stock alerts. Inventory value (quantity × cost) is reported separately from repair earnings
   ([INVENTORY](docs/INVENTORY.md)).
+- **Orders, commission and simulated payments (complete):** marketplace orders reserve the listing in
+  product-service. Payments for orders (`MARKETPLACE_PURCHASE`) and approved repair quotes (`REPAIR_BOOKING`)
+  are simulated with UPI, CARD, NET_BANKING or WALLET, and the caller chooses SUCCESS, FAILED or CANCELLED. Fees
+  are configurable (2% customer fee plus 2% provider commission, frozen per order, quote and payment):
+  ₹1,000 → customer pays ₹1,020, provider nets ₹980, ReLoop keeps ₹40. Every successful payment has a unique
+  `TXN-…` id and separate commission, payout and balanced ledger records. The wrong amount is refused (422) and
+  duplicate payments are blocked. Refunds are proportional and reverse the ledger. Receipts can be printed or
+  downloaded. Customer, seller and repairer dashboards read the same records. No real money, gateway, or card or
+  bank data ([PAYMENTS](docs/PAYMENTS.md)).
+- **Delivery tracking (complete, simulated):** store-to-customer (paid marketplace orders), customer-to-repairer
+  and repairer-to-customer legs. Each has a `TRK-SIM-…` tracking ID, origin and destination taken from 16 predefined
+  Gujarat demo locations, a simulated current position, a status (`BOOKED → PICKED_UP → IN_TRANSIT →
+  NEAR_DESTINATION → DELIVERED`), an estimated arrival and a saved coordinate history. The marker moves only when the
+  demo "advance" button is pressed. Both parties see identical data. A Leaflet + OpenStreetMap demo page is at
+  `http://localhost:8083/tracking-demo.html`. No GPS or courier integration, and every response says so
+  ([DELIVERY_TRACKING](docs/DELIVERY_TRACKING.md)).
 
-Next: marketplace orders & payments → reviews & delivery tracking → frontend integration → testing & deployment.
+- **Web frontend (complete):** static HTML, CSS, Bootstrap 5 and vanilla JS in `frontend/`, served by a
+  dependency-free Node dev server that proxies `/api/**` to the three services (`cd frontend && npm start` →
+  http://localhost:8080). It has a homepage, marketplace, product pages, checkout with the full fee breakdown,
+  a Leaflet map for finding repairers, workshop pages with repair requests, login and both registrations. The
+  customer dashboard covers buying, selling, listings, purchases, sales, repairs, payments, tracking and profile.
+  The repairer dashboard covers overview with a profile-completion prompt, jobs, services, inventory, location,
+  earnings, payments and profile. `npm run start:mock` runs it against an in-memory mock for UI work without Java
+  ([FRONTEND](docs/FRONTEND.md)).
+
+- **Service integration (complete):** inter-service API audit and fixes. Refunds now reach product-service
+  (passport `SALE_REFUNDED`) and repair-service (repair `REFUNDED` / closed), and failed repair payments are
+  reported to both dashboards. Idempotent refunds, shared contract examples in `contracts/` are checked by a
+  contract test in every service, dashboards refresh themselves by polling, and four end-to-end scenarios run
+  in CI against the real stack ([INTEGRATION](docs/INTEGRATION.md)).
+
+Next: reviews → testing & deployment.
 
 ## Documentation
 
@@ -120,9 +166,13 @@ Next: marketplace orders & payments → reviews & delivery tracking → frontend
 - [docs/REPAIRERS.md](docs/REPAIRERS.md) — repairer workshop profiles, search, nearby/map API, authorization, demo workshops
 - [docs/REPAIR_WORKFLOW.md](docs/REPAIR_WORKFLOW.md) — repair booking statuses and rules, quote/payment contracts between services, curl walkthrough, tests
 - [docs/INVENTORY.md](docs/INVENTORY.md) — repairer spare-parts inventory: model, stock rules, low-stock alerts, valuation, API, curl walkthrough, tests
+- [docs/PAYMENTS.md](docs/PAYMENTS.md) — orders, fees and commission, simulated payments, refunds and ledger, receipts, dashboards, API, curl walkthrough, tests
+- [docs/DELIVERY_TRACKING.md](docs/DELIVERY_TRACKING.md) — simulated delivery tracking: three legs, statuses, demo locations, ETA, history, access rules, API, Leaflet/OSM frontend integration, curl walkthrough, tests
+- [docs/FRONTEND.md](docs/FRONTEND.md) — web frontend: how to run it (real services or mock), page map, profile-completion prompt, modules, fee display, security notes
+- [docs/INTEGRATION.md](docs/INTEGRATION.md) — how the services integrate: mismatch audit and fixes, contract table (`contracts/`), ID map, idempotency, error handling, dashboard polling, run instructions, end-to-end scenarios
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
-## Business rules (implemented in later phases)
+## Business rules (implemented; see docs/PAYMENTS.md)
 
 - Customer platform fee 2%, seller/repairer commission 2% — both **configurable**, never hard-coded.
 - All monetary math uses `BigDecimal` / integer paise; payments are simulations only.

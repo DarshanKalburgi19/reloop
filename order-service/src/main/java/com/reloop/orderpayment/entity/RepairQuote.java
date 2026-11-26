@@ -26,7 +26,8 @@ import java.time.LocalDateTime;
     indexes = {
         @Index(name = "ix_quotes_request", columnList = "repair_request_id"),
         @Index(name = "ix_quotes_status", columnList = "status"),
-        @Index(name = "ix_quotes_repairer", columnList = "repairer_profile_id")
+        @Index(name = "ix_quotes_repairer", columnList = "repairer_profile_id"),
+        @Index(name = "ix_quotes_repairer_account", columnList = "repairer_account_id")
     }
 )
 public class RepairQuote extends BaseEntity {
@@ -42,6 +43,10 @@ public class RepairQuote extends BaseEntity {
     /** External ID of product-service Account (no cross-service FK). */
     @Column(name = "customer_account_id", nullable = false)
     private Long customerAccountId;
+
+    /** product-service Account ID of the repairer (login); owner of the payout and earnings. */
+    @Column(name = "repairer_account_id")
+    private Long repairerAccountId;
 
     @Column(name = "quote_revision", nullable = false)
     private int quoteRevision = 1;
@@ -119,6 +124,14 @@ public class RepairQuote extends BaseEntity {
 
     public void setCustomerAccountId(Long customerAccountId) {
         this.customerAccountId = customerAccountId;
+    }
+
+    public Long getRepairerAccountId() {
+        return repairerAccountId;
+    }
+
+    public void setRepairerAccountId(Long repairerAccountId) {
+        this.repairerAccountId = repairerAccountId;
     }
 
     public int getQuoteRevision() {

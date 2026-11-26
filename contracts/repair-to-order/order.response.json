@@ -1,0 +1,10 @@
+{
+  "id": 3,
+  "orderNumber": "ORD-2026-1006",
+  "status": "CONFIRMED",
+  "buyerAccountId": 501,
+  "sellerAccountId": 701,
+  "productId": 42,
+  "productTitle": "iPhone 12, 128 GB",
+  "paidAt": "2026-11-25T10:20:00"
+}

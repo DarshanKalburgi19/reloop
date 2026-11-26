@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find a repairer — ReLoop</title>
+  <meta name="description" content="Find repair workshops near you on a map, compare services, prices and ratings.">
+  <meta name="theme-color" content="#1f5c45">
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
+  <link rel="stylesheet" href="/assets/css/reloop.css">
+</head>
+<body data-layout="public">
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="rl-navbar"></div>
+<main id="main" tabindex="-1">
+  <section class="container py-4 py-lg-5">
+    <div class="rl-page-header">
+      <div><span class="eyebrow">Repair before you replace</span><h1>Find a repairer</h1><p>Local workshops for phones, laptops, appliances, bicycles and more. Request a repair and approve the quote, with every fee shown, before any work starts.</p></div>
+    </div>
+    <form class="card mb-4" id="rf" role="search" aria-label="Search repairers"><div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6 col-lg-3"><label class="form-label" for="rf-q">Search</label><input class="form-control" id="rf-q" name="q" maxlength="100" placeholder="Workshop or repair"></div>
+        <div class="col-6 col-lg-2"><label class="form-label" for="rf-category">Category</label><select class="form-select" id="rf-category" name="category"></select></div>
+        <div class="col-6 col-lg-2"><label class="form-label" for="rf-method">Hand-over</label><select class="form-select" id="rf-method" name="method"></select></div>
+        <div class="col-6 col-lg-2"><label class="form-label" for="rf-city">City</label><input class="form-control" id="rf-city" name="city" maxlength="120" list="rf-cities" placeholder="Any city"><datalist id="rf-cities"><option value="Ahmedabad"><option value="Surat"><option value="Vadodara"><option value="Rajkot"><option value="Gandhinagar"></datalist></div>
+        <div class="col-6 col-lg-1"><label class="form-label" for="rf-sort">Sort</label><select class="form-select" id="rf-sort" name="sort"><option value="rating">Rating</option><option value="price_asc">Price ↑</option><option value="price_desc">Price ↓</option><option value="name">Name</option><option value="newest">Newest</option></select></div>
+        <div class="col-lg-2 d-grid"><button class="btn btn-primary" type="submit"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button></div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+        <div class="form-check m-0"><input class="form-check-input" type="checkbox" id="rf-available" name="availableOnly" value="true"><label class="form-check-label small" for="rf-available">Available now only</label></div>
+        <span class="text-muted small d-none d-md-inline">|</span>
+        <span class="small fw-semibold">Near:</span>
+        <button type="button" class="btn btn-sm btn-light border" id="near-me"><i class="bi bi-crosshair me-1" aria-hidden="true"></i>My location</button>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Search near a city" id="near-cities"></div>
+        <label class="small ms-lg-auto d-flex align-items-center gap-2" for="rf-radius">Radius <select class="form-select form-select-sm w-auto" id="rf-radius"><option value="5">5 km</option><option value="10" selected>10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="100">100 km</option></select></label>
+      </div>
+    </div></form>
+    <div class="row g-4">
+      <div class="col-lg-7 order-lg-2"><div class="map-box tall" id="map" role="application" aria-label="Map of repair workshops"></div><div class="small text-muted mt-1">Map data © OpenStreetMap contributors. Locations of demo workshops are illustrative.</div></div>
+      <div class="col-lg-5 order-lg-1">
+        <div class="d-flex justify-content-between align-items-center mb-2"><div class="small text-muted" id="result-count" aria-live="polite"></div><button type="button" class="btn btn-sm btn-link d-none" id="clear-near">Clear location</button></div>
+        <div id="results" class="d-grid gap-3"></div>
+        <div id="pager"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="rl-footer"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="/assets/js/core/api.js"></script>
+<script src="/assets/js/core/ui.js"></script>
+<script src="/assets/js/core/layout.js"></script>
+<script src="/assets/js/components/cards.js"></script>
+<script src="/assets/js/components/tracking.js"></script>
+<script src="/assets/js/pages/repairers.js"></script>
+</body>
+</html>
