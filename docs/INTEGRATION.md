@@ -224,7 +224,9 @@ All services must share `reloop.jwt.secret` and `RELOOP_INTERNAL_API_KEY`. The d
 
 `scripts/e2e/` uses bash, curl and jq. Every scenario goes through the frontend proxy on `BASE_URL` (default
 `http://localhost:8080`), just like the browser. Each run creates its own products, orders and repairs, so the
-scenarios can run again on the same data.
+scenarios can run again on the same data. On a fresh stack, the first run also completes the demo workshop
+profile with `PUT /api/repairers/{id}`, as a repairer would through the dashboard prompt. Until then, a new
+workshop does not accept requests.
 
 | Script | Checks |
 |---|---|

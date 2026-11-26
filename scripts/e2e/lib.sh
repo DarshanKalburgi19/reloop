@@ -96,7 +96,31 @@ login_all() {
   api GET /api/repairers/me "$REPAIRER" ''
   [[ "$STATUS" == "200" ]] || die "GET /api/repairers/me failed (HTTP $STATUS): $BODY"
   REPAIRER_PROFILE="$(j .id)"
+  if [[ "$(j .listedInSearch)" != "true" ]]; then
+    complete_repairer_profile
+  fi
   info "seller #$SELLER_ID, buyer #$BUYER_ID, repairer account #$REPAIRER_ID (profile #$REPAIRER_PROFILE)"
+}
+
+# A workshop created at registration (the demo one too) only takes requests once the repairer has completed it:
+# description, categories, a priced service and working hours (PUT /api/repairers/{id}, the dashboard's
+# profile-completion prompt). On a fresh stack the scenarios do that once, like a real repairer would.
+complete_repairer_profile() {
+  local me="$BODY"
+  info "completing the demo workshop profile #$REPAIRER_PROFILE (missing: $(j -c '.missingForListing'))"
+  api PUT "/api/repairers/$REPAIRER_PROFILE" "$REPAIRER" "$(printf '%s' "$me" | jq -c '{
+    businessName, addressLine, city, pincode, latitude, longitude,
+    phone: "+919800000002",
+    description: "Phone and laptop repairs: screens, batteries, charging ports and water damage. Genuine parts, 90-day warranty.",
+    categories: ["MOBILE", "LAPTOP", "TABLET"],
+    expertise: ["Screens", "Batteries"],
+    services: [{name: "Screen replacement", category: "MOBILE", priceType: "STARTING_FROM", price: 1500.00, estimatedDays: 2},
+               {name: "Battery replacement", category: "MOBILE", priceType: "FIXED", price: 900.00, estimatedDays: 1}],
+    workingHours: (["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"] | map({day: ., opens: "10:00", closes: "19:00"})),
+    repairMethods: ["IN_PERSON", "SEND_ITEM", "PICKUP_DROPOFF"],
+    availability: "AVAILABLE", availabilityNote: null}')"
+  [[ "$STATUS" == "200" ]] || die "completing the workshop profile failed (HTTP $STATUS): $BODY"
+  [[ "$(j .listedInSearch)" == "true" ]] || die "workshop still not listed after PUT: $(j -c '.missingForListing')"
 }
 
 idem() { echo "e2e-$RUN_ID-$1"; }
