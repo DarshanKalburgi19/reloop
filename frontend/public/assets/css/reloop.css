@@ -185,6 +185,7 @@ a { text-underline-offset: 2px; }
 .repairer-initial { width: 46px; height: 46px; border-radius: 12px; background: var(--rl-green-100); color: var(--rl-green-900); display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; flex-shrink: 0; }
 .chip { display: inline-flex; align-items: center; gap: .3rem; border: 1px solid var(--rl-border); background: var(--rl-bg); color: var(--rl-ink-soft); border-radius: 999px; padding: .12rem .6rem; font-size: .75rem; font-weight: 520; white-space: nowrap; }
 .chip-green { background: var(--rl-green-50); border-color: var(--rl-green-100); color: var(--rl-green-800); }
+.chip-muted { background: transparent; border-style: dashed; }
 .rating { color: #b7791f; font-weight: 600; }
 
 /* ---------- Status badges ---------- */
@@ -302,6 +303,7 @@ a { text-underline-offset: 2px; }
 .stepper .step.current { color: var(--rl-green-800); font-weight: 650; }
 .map-box { height: 340px; border-radius: var(--rl-radius); border: 1px solid var(--rl-border); overflow: hidden; background: var(--rl-bg-deep); }
 .map-box.tall { height: 440px; }
+@media (min-width: 992px) { .map-box.tall { height: 620px; position: sticky; top: 5rem; } }
 .simulated-banner { background: var(--rl-amber-100); color: var(--rl-amber-700); border: 1px solid #efdcb3; border-radius: var(--rl-radius-sm); padding: .55rem .8rem; font-size: .84rem; display: flex; gap: .5rem; align-items: flex-start; }
 
 /* Misc */

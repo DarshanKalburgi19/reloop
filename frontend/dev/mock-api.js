@@ -658,7 +658,7 @@ on('POST', '/api/tracking/deliveries', (c) => {
   if (origin === dest) fail(400, 'Validation failed', { destinationCode: 'origin and destination must differ' });
   if (deliveries.some((d) => d.deliveryType === b.deliveryType && ((b.orderId && d.orderId === Number(b.orderId)) || (b.repairRequestId && d.repairRequestId === Number(b.repairRequestId))))) fail(409, 'A delivery of this type is already booked');
   const o = LOCATIONS.find((l) => l.code === origin);
-  const d = { trackingNumber: 'RLT' + crypto.randomBytes(4).toString('hex').toUpperCase(), deliveryType: b.deliveryType, orderId: b.orderId || null, repairRequestId: b.repairRequestId || null, referenceNumber: ref, customerAccountId, partnerAccountId, originCode: origin, destinationCode: dest, step: 0, bookedAt: now(), pickedUpAt: null, deliveredAt: null, lastUpdatedAt: now(), history: [{ sequence: 1, status: 'BOOKED', latitude: o.latitude, longitude: o.longitude, progressPercent: 0, remainingKm: 0, note: 'Simulated booking created', recordedAt: now() }] };
+  const d = { trackingNumber: 'TRK-SIM-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Array.from(crypto.randomBytes(8), (b) => '0123456789ABCDEFGHJKMNPQRSTVWXYZ'[b % 32]).join(''), deliveryType: b.deliveryType, orderId: b.orderId || null, repairRequestId: b.repairRequestId || null, referenceNumber: ref, customerAccountId, partnerAccountId, originCode: origin, destinationCode: dest, step: 0, bookedAt: now(), pickedUpAt: null, deliveredAt: null, lastUpdatedAt: now(), history: [{ sequence: 1, status: 'BOOKED', latitude: o.latitude, longitude: o.longitude, progressPercent: 0, remainingKm: 0, note: 'Simulated booking created', recordedAt: now() }] };
   deliveries.push(d);
   c.status = 201;
   return deliveryView(d);
