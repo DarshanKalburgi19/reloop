@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overview — ReLoop customer dashboard</title>
+  <meta name="description" content="Your ReLoop customer dashboard.">
+  <meta name="theme-color" content="#1f5c45">
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
+  <link rel="stylesheet" href="/assets/css/reloop.css">
+</head>
+<body data-layout="dashboard" data-role="CUSTOMER" data-nav="customer-overview">
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="rl-navbar"></div>
+<div class="rl-shell">
+  <nav id="rl-sidebar" class="rl-sidebar"></nav>
+  <main id="main" class="rl-content" tabindex="-1">
+    <div class="rl-page-header">
+      <div><h1><span id="greeting">Overview</span></h1><p>Your purchases, sales, repairs and payments at a glance.</p></div>
+      <div class="d-flex flex-wrap gap-2"><a class="btn btn-light border" href="/customer/sell.html"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Sell an item</a><a class="btn btn-primary" href="/customer/buy.html"><i class="bi bi-bag me-1" aria-hidden="true"></i>Buy products</a></div>
+    </div>
+    <div class="row g-3 mb-4" id="stats"></div>
+    <div id="attention" class="mb-4"></div>
+    <div class="row g-4">
+      <div class="col-xl-6">
+        <div class="d-flex justify-content-between align-items-center mb-2"><h2 class="h5 mb-0">Recent purchases</h2><a class="small" href="/customer/purchases.html">View all</a></div>
+        <div id="recent-orders"></div>
+      </div>
+      <div class="col-xl-6">
+        <div class="d-flex justify-content-between align-items-center mb-2"><h2 class="h5 mb-0">Recent repair requests</h2><a class="small" href="/customer/repairs.html">View all</a></div>
+        <div id="recent-repairs"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="/assets/js/core/api.js"></script>
+<script src="/assets/js/core/ui.js"></script>
+<script src="/assets/js/core/layout.js"></script>
+<script src="/assets/js/components/cards.js"></script>
+<script src="/assets/js/components/orders.js"></script>
+<script src="/assets/js/pages/customer-overview.js"></script>
+</body>
+</html>
