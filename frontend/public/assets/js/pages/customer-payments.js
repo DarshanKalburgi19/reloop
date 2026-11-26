@@ -14,6 +14,11 @@ RL.page(async ({ account }) => {
       ui.error('#payments', err, load, 'Could not load your payment history');
       return;
     }
+    live.mark(data);
+    draw(data);
+  }
+
+  function draw(data) {
     const col = (s) => `<div class="col-6 col-xl-3">${RL.cards.statCard(s)}</div>`;
     $('#pay-stats').innerHTML = [
       col({ label: 'Total paid', value: money(data.totalPaidPaise), icon: 'bi-credit-card', sub: `${data.successfulCount} successful payment(s)` }),
@@ -30,10 +35,14 @@ RL.page(async ({ account }) => {
       { label: 'Base', className: 'num', render: (t) => money(t.baseAmountPaise) },
       { label: 'ReLoop fee', className: 'num', render: (t) => money(t.customerFeePaise) },
       { label: 'Total charged', className: 'num fw-semibold', render: (t) => money(t.totalChargedPaise) },
-      { label: 'Status', render: (t) => badge(t.status) + (t.refundedAmountPaise ? `<div class="small text-muted">${money(t.refundedAmountPaise)} refunded</div>` : '') },
+      { label: 'Status', render: (t) => badge(t.status)
+        + (['FAILED', 'CANCELLED'].includes(t.status) ? '<div class="small text-muted">Nothing charged · not confirmed</div>' : '')
+        + (t.refundedAmountPaise ? `<div class="small text-muted">${money(t.refundedAmountPaise)} refunded</div>` : '') },
       { label: '', className: 'text-end text-nowrap', render: (t) => `<button type="button" class="btn btn-light btn-sm border" data-tx="${esc(t.transactionId)}">Details</button>` },
     ], list, { icon: 'bi-credit-card-2-front', title: 'No payments yet', text: 'Payments for purchases and repairs appear here with their full fee breakdown.' });
     $$('[data-tx]').forEach((b) => b.addEventListener('click', () => RL.transactions.showDetail(list.find((t) => t.transactionId === b.dataset.tx))));
   }
+  // refunds issued by a seller / workshop show up here without a reload
+  const live = ui.poll(() => RL.endpoints.reports.customerPayments(account.id), draw, { interval: 15000 });
   load();
 });

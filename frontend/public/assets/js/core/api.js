@@ -217,7 +217,8 @@
       get: (txnId) => api.get('/api/transactions/' + enc(txnId)),
       receiptHtml: (txnId) => api.get('/api/transactions/' + enc(txnId) + '/receipt', { query: { format: 'html' }, responseType: 'text' }),
       ledger: (txnId) => api.get('/api/transactions/' + enc(txnId) + '/ledger'),
-      refund: (txnId, body) => api.post('/api/transactions/' + enc(txnId) + '/refunds', body),
+      refund: (txnId, body, idempotencyKey) => api.post('/api/transactions/' + enc(txnId) + '/refunds', body,
+        { headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {} }),
     },
     reports: {
       customerPayments: (accountId) => api.get('/api/customers/' + enc(accountId) + '/payments'),

@@ -3,7 +3,7 @@
  * (POST /api/orders/{id}/cancel), receipts and simulated delivery tracking.
  */
 RL.page(async () => {
-  const { $, $$, esc, money, badge, dateTime } = RL.ui;
+  const { $, $$, esc, money, dateTime } = RL.ui;
   const ui = RL.ui;
   let orders = [];
   let group = ui.param('filter') || 'all';
@@ -26,7 +26,7 @@ RL.page(async () => {
       { label: 'Price', className: 'num', render: (o) => money(o.subtotalPaise) },
       { label: 'ReLoop fee', className: 'num', render: (o) => money(o.customerFeePaise) },
       { label: 'Total', className: 'num fw-semibold', render: (o) => money(o.totalPaise) },
-      { label: 'Status', render: (o) => badge(o.status) + (o.status === 'PENDING_PAYMENT' && o.expiresAt ? `<div class="small text-muted">until ${esc(dateTime(o.expiresAt))}</div>` : '') },
+      { label: 'Status', render: (o) => RL.orders.statusHtml(o, 'buyer') },
       { label: '', className: 'text-end text-nowrap', render: (o) => `
           ${o.status === 'PENDING_PAYMENT' ? `<a class="btn btn-primary btn-sm" href="/checkout.html?orderId=${encodeURIComponent(o.id)}">Pay</a>
             <button type="button" class="btn btn-outline-danger btn-sm" data-cancel="${esc(o.id)}">Cancel</button>` : ''}
@@ -53,11 +53,14 @@ RL.page(async () => {
     ui.loader('#orders', 'Loading your orders…');
     try {
       orders = await RL.endpoints.orders.list('buyer');
+      live.mark(orders);
       render();
     } catch (err) {
       $('#filter-tabs').innerHTML = '';
       ui.error('#orders', err, load, 'Could not load your purchases');
     }
   }
+  // a sale confirmed, refunded or cancelled elsewhere shows up without a reload
+  const live = ui.poll(() => RL.endpoints.orders.list('buyer'), (data) => { orders = data; render(); });
   load();
 });

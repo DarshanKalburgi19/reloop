@@ -38,26 +38,36 @@ RL.page(async () => {
     $$('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = bucket.tabs.find((t) => t.id === b.dataset.tab); page = 0; tabs(); load(); }));
   }
 
+  // the query depends on the tab and page; responses for an older query are dropped
+  const query = () => ({ status: tab.status, page, size: 20 });
+  const fetchList = async () => { const q = JSON.stringify(query()); return { q, res: await RL.endpoints.repairRequests.incoming(query()) }; };
+  function draw(res) {
+    const href = (r) => '/repairer/repair-request.html?id=' + encodeURIComponent(r.id);
+    ui.table('#jobs', [
+      { label: 'Request', render: (r) => `<a class="fw-semibold mono" href="${href(r)}">${esc(r.requestNumber)}</a><div class="small text-muted">${esc(dateTime(r.createdAt))}</div>` },
+      { label: 'Item', render: (r) => `${esc(r.itemDescription)}<div class="small text-muted">${esc(label(r.category))}</div>` },
+      { label: 'Hand-over', render: (r) => `<span class="small">${esc(label(r.deliveryMethod))}</span>` },
+      { label: 'Quote total', className: 'num', render: (r) => r.quoteTotalPayable !== null && r.quoteTotalPayable !== undefined ? rupees(r.quoteTotalPayable) : '<span class="text-muted small">—</span>' },
+      { label: 'Status', render: (r) => badge(r.status) + ui.paymentBadge(r.paymentStatus) },
+      { label: 'Updated', render: (r) => `<span class="small">${esc(relative(r.updatedAt || r.createdAt))}</span>` },
+      { label: '', className: 'text-end', render: (r) => `<a class="btn btn-sm ${NEXT[r.status] ? 'btn-primary' : 'btn-light border'}" href="${href(r)}">${esc(NEXT[r.status] || 'Open')}</a>` },
+    ], res.content, bucket.empty);
+    ui.pagination('#pager', res, (n) => { page = n; load(); });
+  }
+
   async function load() {
     ui.loader('#jobs', 'Loading repair jobs…');
     $('#pager').innerHTML = '';
     try {
-      const res = await RL.endpoints.repairRequests.incoming({ status: tab.status, page, size: 20 });
-      const href = (r) => '/repairer/repair-request.html?id=' + encodeURIComponent(r.id);
-      ui.table('#jobs', [
-        { label: 'Request', render: (r) => `<a class="fw-semibold mono" href="${href(r)}">${esc(r.requestNumber)}</a><div class="small text-muted">${esc(dateTime(r.createdAt))}</div>` },
-        { label: 'Item', render: (r) => `${esc(r.itemDescription)}<div class="small text-muted">${esc(label(r.category))}</div>` },
-        { label: 'Hand-over', render: (r) => `<span class="small">${esc(label(r.deliveryMethod))}</span>` },
-        { label: 'Quote total', className: 'num', render: (r) => r.quoteTotalPayable !== null && r.quoteTotalPayable !== undefined ? rupees(r.quoteTotalPayable) : '<span class="text-muted small">—</span>' },
-        { label: 'Status', render: (r) => badge(r.status) },
-        { label: 'Updated', render: (r) => `<span class="small">${esc(relative(r.updatedAt || r.createdAt))}</span>` },
-        { label: '', className: 'text-end', render: (r) => `<a class="btn btn-sm ${NEXT[r.status] ? 'btn-primary' : 'btn-light border'}" href="${href(r)}">${esc(NEXT[r.status] || 'Open')}</a>` },
-      ], res.content, bucket.empty);
-      ui.pagination('#pager', res, (n) => { page = n; load(); });
+      const { res } = await fetchList();
+      live.mark({ q: JSON.stringify(query()), res });
+      draw(res);
     } catch (err) {
       ui.error('#jobs', err, load, 'Could not load repair jobs');
     }
   }
   tabs();
+  // new requests, quote decisions, payments (confirmed / failed) and refunds appear without a reload
+  const live = ui.poll(fetchList, ({ q, res }) => { if (q === JSON.stringify(query())) draw(res); });
   load();
 });

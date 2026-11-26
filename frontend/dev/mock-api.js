@@ -87,9 +87,10 @@ function send(res, status, body, headers) {
   res.end(payload);
 }
 class HttpError extends Error {
-  constructor(status, message, fieldErrors) { super(message); this.status = status; this.fieldErrors = fieldErrors; }
+  constructor(status, message, fieldErrors, details) { super(message); this.status = status; this.fieldErrors = fieldErrors; this.details = details; }
 }
-const fail = (status, message, fieldErrors) => { throw new HttpError(status, message, fieldErrors); };
+// details: extra top-level keys of the error body, like the services' {"orderStatus": ...} / {"paymentStatus": ...}
+const fail = (status, message, fieldErrors, details) => { throw new HttpError(status, message, fieldErrors || undefined, details); };
 const ERR = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 409: 'Conflict', 422: 'Unprocessable Entity' };
 
 function readBody(req) {
@@ -179,12 +180,13 @@ function rrView(rr, viewer) {
   return Object.assign({}, rr, {
     repairer: { profileId: r.id, businessName: r.businessName, phone: r.phone, addressLine: r.addressLine, city: r.city, pincode: r.pincode, location: { latitude: r.latitude, longitude: r.longitude } },
     quote: quoteView(rr), allowedActions: (ACTIONS[viewer.role][rr.status] || []).slice(),
+    transactionId: rr.transactionId || null, paymentStatus: rr.paymentStatus || null, refundedAmountPaise: rr.refundedAmountPaise || 0, lastPaymentFailure: rr.lastPaymentFailure || null,
   });
 }
 function rrSummary(rr) {
   const r = repairers.find((x) => x.id === rr.repairerProfileId);
   const q = quoteView(rr);
-  return { id: rr.id, requestNumber: rr.requestNumber, status: rr.status, customerAccountId: rr.customerAccountId, repairerProfileId: rr.repairerProfileId, repairerBusinessName: r.businessName, category: rr.category, itemDescription: rr.itemDescription, deliveryMethod: rr.deliveryMethod, quoteTotalPayable: q ? q.totalPayable : null, createdAt: rr.createdAt, updatedAt: rr.updatedAt };
+  return { id: rr.id, requestNumber: rr.requestNumber, status: rr.status, customerAccountId: rr.customerAccountId, repairerProfileId: rr.repairerProfileId, repairerBusinessName: r.businessName, category: rr.category, itemDescription: rr.itemDescription, deliveryMethod: rr.deliveryMethod, quoteTotalPayable: q ? q.totalPayable : null, createdAt: rr.createdAt, updatedAt: rr.updatedAt, paymentStatus: rr.paymentStatus || null, transactionId: rr.transactionId || null };
 }
 function move(rr, to, actor, note) {
   rr.history.push({ fromStatus: rr.status, toStatus: to, actor, note: note || null, at: now() });
@@ -205,7 +207,17 @@ function addMovement(p, type, change, rrId, note) {
   return m;
 }
 function txView(t) {
-  return Object.assign({}, t, { receiptUrl: '/api/transactions/' + t.transactionId + '/receipt' });
+  const sum = (k) => t.refunds.reduce((a, r) => a + r[k], 0);
+  const settled = ['SUCCESS', 'PARTIALLY_REFUNDED', 'REFUNDED'].includes(t.status);
+  const reversedNet = sum('providerNetReversedPaise'); const reversedRev = sum('reversedCommissionPaise');
+  const po = payouts.find((p) => p.transactionId === t.transactionId);
+  return Object.assign({}, t, {
+    refundedAmountPaise: sum('refundAmountPaise'), reversedProviderNetPaise: reversedNet, reversedPlatformRevenuePaise: reversedRev,
+    currentProviderNetPaise: settled ? t.providerNetPaise - reversedNet : 0, currentPlatformRevenuePaise: settled ? t.platformRevenuePaise - reversedRev : 0,
+    commissionStatus: !settled ? null : t.status === 'REFUNDED' ? 'REVERSED' : t.status === 'PARTIALLY_REFUNDED' ? 'PARTIALLY_REVERSED' : 'RECORDED',
+    payoutReference: po ? po.payoutReference : null, payoutStatus: po ? po.status : null,
+    receiptUrl: '/api/transactions/' + t.transactionId + '/receipt',
+  });
 }
 function orderView(o) {
   return Object.assign({}, o, { payments: txns.filter((t) => t.orderId === o.id).map((t) => ({ transactionId: t.transactionId, status: t.status, method: t.method, amountPaise: t.totalChargedPaise, failureReason: t.failureReason, attemptedAt: t.attemptedAt })) });
@@ -295,7 +307,7 @@ on('GET', '/api/products/:id', (c) => {
 on('GET', '/api/products/:id/passport', (c) => {
   const p = products.find((x) => x.id === Number(c.params.id));
   if (!p) fail(404, 'Product not found');
-  return { passportCode: p.passportCode, productId: p.id, title: p.title, category: p.category, condition: p.condition, availability: p.availability, issuedAt: p.createdAt, listingCount: 1, ownershipTransfers: p.soldAt ? 1 : 0, listingIds: [p.id], history: [{ eventType: 'LISTED', occurredAt: p.createdAt, productId: p.id, actorRole: 'SELLER', price: rupees(p.pricePaise), details: 'Listed in ' + p.city }].concat(p.soldAt ? [{ eventType: 'SOLD', occurredAt: p.soldAt, productId: p.id, actorRole: 'BUYER', price: rupees(p.pricePaise), details: 'Sold through ReLoop' }] : []) };
+  return { passportCode: p.passportCode, productId: p.id, title: p.title, category: p.category, condition: p.condition, availability: p.availability, issuedAt: p.createdAt, listingCount: 1, ownershipTransfers: p.soldAt ? 1 : 0, listingIds: [p.id], history: [{ eventType: 'LISTED', occurredAt: p.createdAt, productId: p.id, actorRole: 'SELLER', price: rupees(p.pricePaise), details: 'Listed in ' + p.city }].concat(p.soldAt ? [{ eventType: 'SOLD', occurredAt: p.soldAt, productId: p.id, actorRole: 'BUYER', price: rupees(p.pricePaise), details: 'Sold through ReLoop' }] : []).concat((p.refundEvents || []).map((e) => ({ eventType: 'SALE_REFUNDED', occurredAt: e.at, productId: p.id, actorRole: null, price: rupees(p.pricePaise), details: e.details }))) };
 });
 function productBody(b, create) {
   required(b, ['title', 'description', 'category', 'price', 'condition', 'city']);
@@ -403,8 +415,14 @@ on('POST', '/api/payments/simulate', (c) => {
   if (outcome === 'SUCCESS') {
     payouts.push({ payoutReference: 'PO-' + t.transactionId.slice(4), transactionId: t.transactionId, transactionType: t.transactionType, providerType: ctx.providerType, providerId: null, providerAccountId: ctx.providerAccountId, grossAmountPaise: base, commissionPaise: pf, netAmountPaise: base - pf, refundedGrossPaise: 0, reversedCommissionPaise: 0, reversedNetPaise: 0, currentNetPaise: base - pf, status: 'PENDING', currency: 'INR', createdAt: now(), paidAt: null });
     if (ctx.o) { Object.assign(ctx.o, { status: 'CONFIRMED', paidAt: now(), amountDuePaise: 0 }); const p = products.find((x) => x.id === ctx.o.productId); if (p) { p.availability = 'SOLD'; p.soldAt = now(); } }
-    if (ctx.rr) { move(ctx.rr, 'PAID', 'SYSTEM', 'Payment ' + t.transactionId + ' received (simulated)'); ctx.rr.paymentTransactionId = txns.length; }
+    if (ctx.rr) { move(ctx.rr, 'PAID', 'SYSTEM', 'Payment ' + t.transactionId + ' received (simulated)'); Object.assign(ctx.rr, { paymentTransactionId: txns.length, transactionId: t.transactionId, paymentStatus: 'PAID', lastPaymentFailure: null }); }
+    if (ctx.o) ctx.o.lastPaymentFailure = null;
   } else if (ctx.o) { ctx.o.lastPaymentFailure = t.failureReason; }
+  else if (ctx.rr) {
+    // order-service → repair-service payment-events (FAILED / CANCELLED): shown on both dashboards, quote stays payable
+    Object.assign(ctx.rr, { paymentStatus: outcome, lastPaymentFailure: t.failureReason, updatedAt: now() });
+    ctx.rr.history.push({ fromStatus: ctx.rr.status, toStatus: ctx.rr.status, actor: 'SYSTEM', note: 'Payment ' + t.transactionId + ' ' + outcome.toLowerCase() + ': ' + t.failureReason + '. Nothing was charged; the quote can still be paid', at: now() });
+  }
   c.status = 201;
   return txView(t);
 });
@@ -424,19 +442,47 @@ on('GET', '/api/transactions/:id/receipt', (c) => {
 on('POST', '/api/transactions/:id/refunds', (c) => {
   const acc = auth(c.req);
   const t = findTx(c, acc);
-  if (t.buyerAccountId === acc.id) fail(403, 'Only the seller or repairer can refund this payment');
+  if (t.buyerAccountId === acc.id) fail(403, 'Only the seller or repairer who received this payment (or ReLoop support) can refund it');
+  const key = c.req.headers['idempotency-key'];
+  if (key && t.refunds.some((r) => r.idempotencyKey === key)) { c.headers = { 'Idempotent-Replay': 'true' }; return txView(t); }
+  if (t.status === 'REFUNDED') fail(409, 'Transaction ' + t.transactionId + ' has already been fully refunded', null, { paymentStatus: t.status });
+  if (!['SUCCESS', 'PARTIALLY_REFUNDED'].includes(t.status)) fail(409, 'Only successful payments can be refunded; transaction ' + t.transactionId + ' is ' + t.status + ' and nothing was charged', null, { paymentStatus: t.status });
   required(c.body, ['reason']);
-  const left = t.baseAmountPaise - t.refundedAmountPaise;
-  const base = c.body.baseAmountPaise ? Number(c.body.baseAmountPaise) : left;
-  if (base <= 0 || base > left) fail(422, 'You can refund at most ' + left + ' paise of the base amount', { baseAmountPaise: 'must be at most ' + left });
-  const cf = Math.round(t.customerFeePaise * base / t.baseAmountPaise); const pf = Math.round(t.providerCommissionPaise * base / t.baseAmountPaise);
-  t.refunds.push({ refundReference: 'RF-' + nextId(), transactionId: t.transactionId, status: 'COMPLETED', reason: c.body.reason, note: c.body.note, refundAmountPaise: base + cf, refundedBasePaise: base, refundedCustomerFeePaise: cf, reversedProviderCommissionPaise: pf, providerNetReversedPaise: base - pf, reversedCommissionPaise: cf + pf, currency: 'INR', completedAt: now() });
-  t.refundedAmountPaise += base;
-  t.status = t.refundedAmountPaise >= t.baseAmountPaise ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+  const doneBase = t.refunds.reduce((a, r) => a + r.refundedBasePaise, 0);
+  const left = t.baseAmountPaise - doneBase;
+  const base = c.body.baseAmountPaise == null ? left : Number(c.body.baseAmountPaise);
+  if (!(base > 0) || base > left) fail(400, 'Validation failed', { baseAmountPaise: base > 0 ? 'must be at most ' + left + ' paise (what is left to refund)' : 'must be greater than 0' });
+  const full = base === left;
+  const doneCf = t.refunds.reduce((a, r) => a + r.refundedCustomerFeePaise, 0); const donePf = t.refunds.reduce((a, r) => a + r.reversedProviderCommissionPaise, 0);
+  const cf = full ? t.customerFeePaise - doneCf : Math.round(t.customerFeePaise * base / t.baseAmountPaise);
+  const pf = full ? t.providerCommissionPaise - donePf : Math.round(t.providerCommissionPaise * base / t.baseAmountPaise);
+  const refund = { refundReference: 'RFD-' + crypto.randomBytes(5).toString('hex').toUpperCase(), idempotencyKey: key || null, transactionId: t.transactionId, status: 'COMPLETED', reason: c.body.reason, note: c.body.note || null, refundAmountPaise: base + cf, refundedBasePaise: base, refundedCustomerFeePaise: cf, reversedProviderCommissionPaise: pf, providerNetReversedPaise: base - pf, reversedCommissionPaise: cf + pf, currency: 'INR', completedAt: now() };
+  t.refunds.push(refund);
+  t.status = full ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+  const total = t.refunds.reduce((a, r) => a + r.refundAmountPaise, 0);
   const po = payouts.find((p) => p.transactionId === t.transactionId);
-  if (po) { po.refundedGrossPaise += base; po.reversedCommissionPaise += pf; po.reversedNetPaise += base - pf; po.currentNetPaise = po.netAmountPaise - po.reversedNetPaise; po.status = t.status === 'REFUNDED' ? 'REVERSED' : 'PARTIALLY_REVERSED'; }
+  if (po) { po.refundedGrossPaise += base; po.reversedCommissionPaise += pf; po.reversedNetPaise += base - pf; po.currentNetPaise = po.netAmountPaise - po.reversedNetPaise; po.status = full ? 'REVERSED' : 'PARTIALLY_REVERSED'; }
   const o = t.orderId && orders.find((x) => x.id === t.orderId);
-  if (o) { o.status = t.status; o.refundedAmountPaise = t.refundedAmountPaise; }
+  if (o) {
+    Object.assign(o, { status: t.status, refundedAmountPaise: total, refundedAt: now() });
+    // order-service → product-service sale-refund: recorded on the passport, the product stays SOLD
+    const p = products.find((x) => x.id === o.productId);
+    if (p) (p.refundEvents = p.refundEvents || []).push({ at: now(), details: (full ? 'Sale fully refunded' : 'Sale partly refunded') + ': refund ' + refund.refundReference + ' (₹' + (refund.refundAmountPaise / 100).toFixed(2) + ', ₹' + (total / 100).toFixed(2) + ' refunded in total) on transaction ' + t.transactionId + ' of order ' + o.orderNumber + ', reason ' + refund.reason });
+  }
+  const rr = t.repairRequestId && repairRequests.find((x) => x.id === t.repairRequestId);
+  if (rr) {
+    // order-service → repair-service payment-events (PARTIALLY_REFUNDED / REFUNDED)
+    rr.refundedAmountPaise = total;
+    rr.paymentStatus = full ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+    const note = 'Payment ' + t.transactionId + (full ? ' fully' : ' partly') + ' refunded: ₹' + (total / 100).toFixed(2) + ' returned to the customer in total (' + refund.reason + ')';
+    if (full && ['PAID', 'IN_PROGRESS'].includes(rr.status)) {
+      move(rr, 'CANCELLED', 'SYSTEM', note + '; the unfinished repair is closed');
+      rr.closeReason = 'Payment refunded (' + t.transactionId + ')';
+    } else {
+      rr.history.push({ fromStatus: rr.status, toStatus: rr.status, actor: 'SYSTEM', note, at: now() });
+      rr.updatedAt = now();
+    }
+  }
   return txView(t);
 });
 on('GET', '/api/customers/:id/payments', (c) => {
@@ -710,7 +756,7 @@ async function handle(req, res, url) {
       send(res, c.status, out, c.headers);
     } catch (e) {
       if (!(e instanceof HttpError)) { console.error(e); e = new HttpError(500, 'Mock error: ' + e.message); } // eslint-disable-line no-console, no-ex-assign
-      send(res, e.status, { timestamp: new Date().toISOString(), status: e.status, error: ERR[e.status] || 'Error', message: e.message, path: url.pathname, fieldErrors: e.fieldErrors });
+      send(res, e.status, Object.assign({ timestamp: new Date().toISOString(), status: e.status, error: ERR[e.status] || 'Error', message: e.message, path: url.pathname, fieldErrors: e.fieldErrors }, e.details || {}));
     }
     return;
   }

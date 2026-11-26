@@ -9,6 +9,10 @@
  *
  * The quote is always shown with the full fee breakdown (repair amount, customer fee, total, repairer gross,
  * commission, net, ReLoop total). The customer must see it again and tick a confirmation before approving.
+ *
+ * Both parties see the payment state reported by order-service (paymentStatus, transactionId, lastPaymentFailure,
+ * refundedAmountPaise) and the page polls GET /api/repair-requests/{id} (RL.poll) so a quote sent, a payment made
+ * or a refund issued by the other side shows up without a manual reload.
  */
 RL.page(async ({ role }) => {
   const { $, $$, esc, money, rupees, label, badge, dateTime, toPaise } = RL.ui;
@@ -90,6 +94,30 @@ RL.page(async ({ role }) => {
   const can = (a) => (req.allowedActions || []).includes(a);
 
   // ------------------------------------------------------------ rendering
+  /** Payment state as seen by both sides: failed attempts, the paid transaction, refunds. */
+  function paymentHtml() {
+    const ps = req.paymentStatus;
+    if (!ps) return '';
+    if (ps === 'FAILED' || ps === 'CANCELLED') {
+      const what = ps === 'FAILED' ? 'The last payment attempt failed' : 'The last payment attempt was cancelled';
+      const next = isCustomer
+        ? 'Nothing was charged and the repair has not been confirmed. You can try again below.'
+        : 'Nothing was charged, so this job is not confirmed and no payout was created. Wait for the customer to pay before starting work.';
+      return `<div class="alert alert-danger d-flex gap-2 mb-0" role="status" data-payment-alert="${esc(ps)}"><i class="bi bi-exclamation-octagon" aria-hidden="true"></i>
+        <div><strong>${esc(what)}.</strong> ${req.lastPaymentFailure ? esc(req.lastPaymentFailure) + '. ' : ''}${esc(next)}</div></div>`;
+    }
+    const tx = req.transactionId ? `<button type="button" class="btn btn-link p-0 mono" data-tx="${esc(req.transactionId)}">${esc(req.transactionId)}</button>` : '—';
+    const refunded = req.refundedAmountPaise ? `<dt>Refunded to customer</dt><dd class="text-danger">${money(req.refundedAmountPaise)}</dd>` : '';
+    const note = ps === 'REFUNDED'
+      ? (isCustomer ? 'This payment was refunded in full.' : 'Refunded in full: your commission and payout for this job were reversed.')
+      : ps === 'PARTIALLY_REFUNDED'
+        ? (isCustomer ? 'Part of this payment was refunded.' : 'Partly refunded: your commission and payout were reduced in proportion.')
+        : (isCustomer ? 'Payment received. The workshop has been notified.' : 'Payment confirmed. This job is paid; your payout is pending (simulated).');
+    return `<div class="card" data-payment-card="${esc(ps)}"><div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-credit-card me-1" aria-hidden="true"></i>Payment</span>${badge(ps)}</div>
+      <div class="card-body small"><dl class="dl-grid mb-2"><dt>Transaction</dt><dd>${tx}</dd>${req.paidAt ? `<dt>Paid</dt><dd>${esc(dateTime(req.paidAt))}</dd>` : ''}${refunded}</dl>
+      <p class="mb-0 text-muted">${esc(note)}</p></div></div>`;
+  }
+
   function progressHtml() {
     if (CLOSED.includes(req.status)) {
       return `<div class="alert alert-${req.status === 'QUOTE_REJECTED' ? 'warning' : 'secondary'} small mb-0">${badge(req.status)} <span class="ms-1">${esc(req.closeReason || '')}</span></div>`;
@@ -196,7 +224,7 @@ RL.page(async ({ role }) => {
     const showPay = isCustomer && can('pay') && req.quote;
     root.innerHTML = `
       <div class="rl-page-header">
-        <div><h1 class="d-flex flex-wrap align-items-center gap-2">${esc(req.requestNumber)} ${badge(req.status)}</h1>
+        <div><h1 class="d-flex flex-wrap align-items-center gap-2">${esc(req.requestNumber)} ${badge(req.status)}${ui.paymentBadge(req.paymentStatus)}</h1>
           <p>${esc(req.itemDescription)} · ${esc(isCustomer ? (req.repairer && req.repairer.businessName) : 'Customer #' + req.customerAccountId)} · requested ${esc(dateTime(req.createdAt))}</p></div>
         <div><a class="btn btn-light border" href="${listHref}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
           <button type="button" class="btn btn-light border" data-reload><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span class="visually-hidden">Refresh</span></button></div>
@@ -204,6 +232,7 @@ RL.page(async ({ role }) => {
       <div class="row g-4">
         <div class="col-xl-8 d-grid gap-4 align-content-start">
           ${actionsHtml()}
+          ${paymentHtml()}
           ${showPay ? `<div class="row g-3" id="pay-section"><div class="col-lg-6">${RL.fees.html(RL.fees.fromQuote(req.quote), { title: 'You are paying', providerLabel: 'Repairer' })}</div><div class="col-lg-6" id="pay-form"></div></div>` : quoteHtml()}
           ${detailsHtml()}
           ${deliveriesHtml()}
@@ -217,6 +246,9 @@ RL.page(async ({ role }) => {
       </div>`;
 
     $('[data-reload]', root).addEventListener('click', load);
+    // the repairer (the payment's provider) can refund from here; order-service then reports it back to this request
+    $$('[data-tx]', root).forEach((b) => b.addEventListener('click', () => RL.transactions.showDetail(b.dataset.tx,
+      { asProvider: !isCustomer, allowRefund: !isCustomer, onChange: () => live.refresh() })));
     $$('[data-action]', root).forEach((b) => b.addEventListener('click', () => runAction(b.dataset.action, b)));
     $$('[data-book]', root).forEach((b) => b.addEventListener('click', () => book(b.dataset.book)));
     $$('[data-tn]', root).forEach((b) => b.addEventListener('click', () => showLeg(b.dataset.tn)));
@@ -230,10 +262,9 @@ RL.page(async ({ role }) => {
         target: { repairQuoteId: req.quote.quoteId },
         title: 'Pay for this repair (simulated)',
         onResult: (tx) => {
-          if (tx.status === 'SUCCESS') {
-            ui.toast('The workshop has been notified that you paid.', 'info');
-            window.setTimeout(load, 600);
-          }
+          if (tx.status === 'SUCCESS') ui.toast('The workshop has been notified that you paid.', 'info');
+          // failed / cancelled attempts are recorded on the request too (paymentStatus), so refresh either way
+          window.setTimeout(() => live.refresh(), 600);
         },
       });
     }
@@ -433,6 +464,23 @@ RL.page(async ({ role }) => {
       loadParts();
     }
   }
+
+  // ------------------------------------------------------------ live refresh
+  // Re-render only when something the user can see changed: never while the pay form or a dialog is in use.
+  const significant = (r) => JSON.stringify([r.status, r.paymentStatus, r.transactionId, r.refundedAmountPaise,
+    r.lastPaymentFailure, (r.history || []).length, r.quote && [r.quote.quoteId, r.quote.state], r.allowedActions]);
+  const live = ui.poll(() => R.get(id), async (fresh) => {
+    if (!req) return;
+    const changed = significant(fresh) !== significant(req);
+    const statusChanged = fresh.status !== req.status;
+    req = fresh;
+    if (!changed) return;
+    if (statusChanged) {
+      ui.toast(`${req.requestNumber} is now "${label(req.status)}".`, 'info');
+      await loadLegs();
+    }
+    render();
+  }, { interval: 8000 });
 
   load();
 });

@@ -17,6 +17,23 @@
     { id: 'closed', label: 'Cancelled & refunded', match: (o) => ['CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(o.status) },
   ];
 
+  /**
+   * Status cell shared by purchases, sales and the overview: the order status plus what the other side needs to
+   * know: a failed / cancelled payment attempt (nothing charged, order not confirmed, no payout) and refunds.
+   */
+  function statusHtml(o, role) {
+    const lines = [];
+    if (o.status === 'PENDING_PAYMENT' && o.lastPaymentFailure) {
+      lines.push(`<div class="small text-danger" data-payment-failed><i class="bi bi-x-octagon me-1" aria-hidden="true"></i>${role === 'seller'
+        ? 'Buyer\'s payment failed · not confirmed, no payout' : 'Payment failed · nothing charged'}</div>`);
+    }
+    if (o.status === 'PENDING_PAYMENT' && o.expiresAt && role !== 'seller') lines.push(`<div class="small text-muted">until ${esc(dateTime(o.expiresAt))}</div>`);
+    if (o.refundedAmountPaise) {
+      lines.push(`<div class="small text-muted" data-refunded>${money(o.refundedAmountPaise)} refunded${role === 'seller' ? ' · commission &amp; payout reversed' : ''}</div>`);
+    }
+    return badge(o.status) + lines.join('');
+  }
+
   function successfulPayment(o) {
     return (o.payments || []).find((p) => ['SUCCESS', 'PARTIALLY_REFUNDED', 'REFUNDED'].includes(p.status)) || null;
   }
@@ -74,5 +91,5 @@
     });
   }
 
-  RL.orders = { GROUPS, showDetail, successfulPayment };
+  RL.orders = { GROUPS, showDetail, successfulPayment, statusHtml };
 })(window);

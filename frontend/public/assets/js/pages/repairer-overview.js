@@ -44,8 +44,8 @@ RL.page(async ({ account }) => {
     }
   }
 
-  async function requests() {
-    ui.loader('#recent', 'Loading requests…');
+  async function requests(quiet) {
+    if (quiet !== true) ui.loader('#recent', 'Loading requests…');
     try {
       const [fresh, active, done] = await Promise.all([
         RL.endpoints.repairRequests.incoming({ status: NEW, size: 5 }),
@@ -60,7 +60,7 @@ RL.page(async ({ account }) => {
       ui.table('#recent', [
         { label: 'Request', render: (r) => `<a class="fw-semibold mono" href="/repairer/repair-request.html?id=${encodeURIComponent(r.id)}">${esc(r.requestNumber)}</a><div class="small text-muted">${esc(relative(r.createdAt))}</div>` },
         { label: 'Item', render: (r) => `${esc(r.itemDescription)}<div class="small text-muted">${esc(label(r.category))} · ${esc(label(r.deliveryMethod))}</div>` },
-        { label: 'Status', render: (r) => badge(r.status) },
+        { label: 'Status', render: (r) => badge(r.status) + ui.paymentBadge(r.paymentStatus) },
         { label: '', className: 'text-end', render: (r) => `<a class="btn btn-sm btn-primary" href="/repairer/repair-request.html?id=${encodeURIComponent(r.id)}">Review</a>` },
       ], fresh.content, { icon: 'bi-inbox', title: 'No new requests', text: 'New repair requests from customers appear here.', actionHref: '/repairer/active.html', actionLabel: 'View active repairs' });
     } catch (err) {
@@ -68,8 +68,8 @@ RL.page(async ({ account }) => {
     }
   }
 
-  async function earnings() {
-    ui.loader('#earnings-card', 'Loading earnings…');
+  async function earnings(quiet) {
+    if (quiet !== true) ui.loader('#earnings-card', 'Loading earnings…');
     try {
       const e = await RL.endpoints.reports.providerEarnings(account.id);
       const t = (e.byTransactionType && e.byTransactionType.REPAIR_BOOKING) || e.totals || {};
@@ -101,8 +101,18 @@ RL.page(async ({ account }) => {
     }
   }
 
+  // Live refresh: a new request, a payment (confirmed or failed) or a refund changes this snapshot; the request
+  // and earnings sections are then redrawn quietly (they both write into #stats, so it is cleared first).
+  const snapshot = () => Promise.all([
+    RL.endpoints.repairRequests.incoming({ status: NEW, size: 5 }),
+    RL.endpoints.repairRequests.incoming({ status: ACTIVE, size: 50 }),
+    RL.endpoints.reports.providerEarnings(account.id),
+  ]);
+  const live = ui.poll(snapshot, () => { $('#stats').innerHTML = ''; requests(true); earnings(true); stock(); }, { interval: 15000 });
+
   listing();
   requests();
   earnings();
   stock();
+  snapshot().then((s) => live.mark(s), () => {});
 });

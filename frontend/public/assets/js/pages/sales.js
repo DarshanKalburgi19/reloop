@@ -4,13 +4,13 @@
  * refund (POST /api/transactions/{id}/refunds).
  */
 RL.page(async ({ account }) => {
-  const { $, $$, esc, money, badge, dateTime } = RL.ui;
+  const { $, $$, esc, money, dateTime } = RL.ui;
   const ui = RL.ui;
   let orders = [];
   let group = 'all';
 
-  async function loadStats() {
-    ui.loader('#sales-stats', 'Loading earnings…');
+  async function loadStats(quiet) {
+    if (quiet !== true) ui.loader('#sales-stats', 'Loading earnings…');
     try {
       const e = await RL.endpoints.reports.providerEarnings(account.id);
       const t = (e.byTransactionType && e.byTransactionType.MARKETPLACE_PURCHASE) || e.totals || {};
@@ -40,7 +40,7 @@ RL.page(async ({ account }) => {
       { label: 'Gross', className: 'num', render: (o) => money(o.subtotalPaise) },
       { label: 'Commission', className: 'num', render: (o) => `− ${money(o.providerCommissionPaise)}` },
       { label: 'Your net', className: 'num fw-semibold', render: (o) => money(o.sellerNetPaise) },
-      { label: 'Status', render: (o) => badge(o.status) },
+      { label: 'Status', render: (o) => RL.orders.statusHtml(o, 'seller') },
       { label: '', className: 'text-end text-nowrap', render: (o) => `
         ${o.status === 'CONFIRMED' ? `<button type="button" class="btn btn-primary btn-sm" data-ship="${esc(o.id)}"><i class="bi bi-truck"></i> Book delivery</button>` : ''}
         ${['CONFIRMED', 'PARTIALLY_REFUNDED'].includes(o.status) && RL.orders.successfulPayment(o) ? `<button type="button" class="btn btn-outline-danger btn-sm" data-refund="${esc(o.id)}">Refund</button>` : ''}
@@ -70,12 +70,15 @@ RL.page(async ({ account }) => {
     ui.loader('#orders', 'Loading your sales…');
     try {
       orders = await RL.endpoints.orders.list('seller');
+      live.mark(orders);
       render();
     } catch (err) {
       $('#filter-tabs').innerHTML = '';
       ui.error('#orders', err, load, 'Could not load your sales');
     }
   }
+  // the buyer paying / failing / getting a refund changes this list and the earnings totals
+  const live = ui.poll(() => RL.endpoints.orders.list('seller'), (data) => { orders = data; render(); loadStats(true); });
   loadStats();
   load();
 });

@@ -118,6 +118,17 @@ class RefundApiTest extends ApiTestBase {
     }
 
     @Test
+    void overlongIdempotencyKeyIsRejectedBeforeAnythingIsRefunded() throws Exception {
+        String txn = paidOrder(BUYER, PRODUCT).get("transactionId").asText();
+        mvc.perform(post("/api/transactions/{t}/refunds", txn).header("Authorization", Tokens.customer(SELLER))
+                        .header("Idempotency-Key", "k".repeat(101))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"OTHER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors['Idempotency-Key']").exists());
+        assertThat(refunds.count()).isZero();
+    }
+
+    @Test
     void onlyTheProviderOrSupportCanRefund() throws Exception {
         String txn = paidOrder(BUYER, PRODUCT).get("transactionId").asText();
         String body = "{\"reason\":\"CUSTOMER_REQUEST\"}";

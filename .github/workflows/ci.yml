@@ -114,3 +114,51 @@ jobs:
           curl -fs http://localhost:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep -q CUSTOMER
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/internal/orders/1); echo "internal -> $code"; [ "$code" = 404 ]
           curl -sI http://localhost:8080/ | grep -qi "content-security-policy"
+
+      - name: End-to-end scenarios against the mock backend
+        run: |
+          (cd frontend && PORT=8081 node server.js --mock > e2e-mock.log 2>&1 &)
+          for i in $(seq 1 20); do curl -fs http://localhost:8081/healthz >/dev/null && break; sleep 0.5; done
+          BASE_URL=http://localhost:8081 bash scripts/e2e/run-all.sh
+
+  e2e:
+    name: End-to-end (real services)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Start the stack (3 services + frontend proxy)
+        env:
+          E2E_LOG_DIR: ${{ runner.temp }}/reloop-e2e
+        run: bash scripts/e2e/start-stack.sh --build
+
+      - name: Run the four scenarios (sale, repair, failed payment, refund)
+        run: bash scripts/e2e/run-all.sh
+
+      - name: Service logs
+        if: failure()
+        run: |
+          for f in "${{ runner.temp }}"/reloop-e2e/*.log; do
+            echo "::group::$(basename "$f")"; tail -n 300 "$f"; echo "::endgroup::"
+          done
+
+      - name: Stop the stack
+        if: always()
+        env:
+          E2E_LOG_DIR: ${{ runner.temp }}/reloop-e2e
+        run: bash scripts/e2e/start-stack.sh --stop

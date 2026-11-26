@@ -132,8 +132,9 @@
   // ---------------------------------------------------------------- status badges
   const TONES = {
     success: ['ACTIVE', 'AVAILABLE', 'CONFIRMED', 'SUCCESS', 'PAID', 'COMPLETED', 'DELIVERED', 'IN_STOCK', 'VERIFIED', 'APPROVED', 'RECORDED'],
-    warning: ['PENDING_PAYMENT', 'PENDING', 'AWAITING_PAYMENT', 'QUOTED', 'LOW_STOCK', 'BUSY', 'RESERVED', 'ON_HOLD', 'SENT', 'INITIATED'],
-    danger: ['FAILED', 'CANCELLED', 'REJECTED', 'QUOTE_REJECTED', 'OUT_OF_STOCK', 'UNAVAILABLE', 'SUSPENDED', 'REVERSED'],
+    warning: ['PENDING_PAYMENT', 'PENDING', 'AWAITING_PAYMENT', 'QUOTED', 'LOW_STOCK', 'BUSY', 'RESERVED', 'ON_HOLD', 'SENT', 'INITIATED',
+      'PARTIALLY_REFUNDED', 'PARTIALLY_REVERSED'],
+    danger: ['FAILED', 'CANCELLED', 'REJECTED', 'QUOTE_REJECTED', 'OUT_OF_STOCK', 'UNAVAILABLE', 'SUSPENDED', 'REVERSED', 'REFUNDED'],
     info: ['REQUESTED', 'ACCEPTED', 'INSPECTED', 'QUOTE_APPROVED', 'IN_PROGRESS', 'BOOKED', 'PICKED_UP', 'IN_TRANSIT', 'NEAR_DESTINATION'],
   };
   function tone(status) {
@@ -144,6 +145,86 @@
   function badge(status, text) {
     if (!status) return '<span class="status-badge status-neutral">Unknown</span>';
     return `<span class="status-badge status-${tone(status)}">${esc(text || label(status))}</span>`;
+  }
+
+  /**
+   * Payment state of a repair request (repair-service paymentStatus, reported by order-service). PAID is already
+   * implied by the workflow status, so only the states that need attention get a badge.
+   */
+  const PAYMENT_TEXT = { FAILED: 'Last payment failed', CANCELLED: 'Payment cancelled', PARTIALLY_REFUNDED: 'Partly refunded', REFUNDED: 'Refunded' };
+  function paymentBadge(paymentStatus) {
+    return PAYMENT_TEXT[paymentStatus] ? ' ' + badge(paymentStatus, PAYMENT_TEXT[paymentStatus]) : '';
+  }
+
+  // ---------------------------------------------------------------- live refresh (MVP polling)
+  /**
+   * Keeps a dashboard in sync with what the other party does, without websockets: calls fetcher() every
+   * `interval` ms and apply(data) only when the response changed (JSON fingerprint), so nothing flickers.
+   * - runs only while the tab is visible; refreshes at once when the tab becomes visible again;
+   * - waits while the user is busy (a dialog is open or a form field has focus), so input is never lost;
+   * - backs off on errors (interval x2, x4 … up to maxInterval) and resets after the next success;
+   * - stops on 401/403 (the session handling takes over);
+   * - shows its state in #live-status (created in the page header when missing).
+   * Returns { stop, refresh, mark(data) }: call mark() with the data the page loaded itself.
+   */
+  function poll(fetcher, apply, opts) {
+    const o = Object.assign({ interval: 10000, maxInterval: 60000 }, opts);
+    let last = null; let timer = null; let delay = o.interval; let inFlight = false; let stopped = false; let failures = 0;
+    const fingerprint = (data) => { try { return JSON.stringify(data); } catch (e) { return null; } };
+    const busy = () => {
+      if (document.querySelector('.modal.show, dialog[open]')) return true;
+      const el = document.activeElement;
+      return !!(el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.closest('form'));
+    };
+    function indicator(state, retryMs) {
+      let el = document.getElementById('live-status');
+      if (!el) {
+        const header = document.querySelector('.rl-page-header');
+        if (!header) return;
+        el = document.createElement('div');
+        el.id = 'live-status';
+        el.className = 'rl-live small text-muted';
+        header.appendChild(el);
+      }
+      const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      el.dataset.state = state;
+      el.title = 'This page refreshes itself every ' + Math.round(o.interval / 1000) + ' s while it is open.';
+      el.innerHTML = state === 'ok'
+        ? `<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Live · updated ${esc(time)}`
+        : state === 'error'
+          ? `<i class="bi bi-wifi-off" aria-hidden="true"></i> Connection problem · retrying in ${Math.round(retryMs / 1000)} s`
+          : '<i class="bi bi-pause-circle" aria-hidden="true"></i> Auto-refresh stopped';
+    }
+    function schedule(ms) { clearTimeout(timer); if (!stopped) timer = setTimeout(tick, ms); }
+    async function tick(force) {
+      if (stopped || document.visibilityState === 'hidden') return; // resumed by visibilitychange
+      if (inFlight || (force !== true && busy())) { schedule(o.interval); return; }
+      inFlight = true;
+      try {
+        const data = await fetcher();
+        failures = 0; delay = o.interval;
+        const fp = fingerprint(data);
+        if (fp === null || fp !== last) { last = fp; apply(data); }
+        indicator('ok');
+      } catch (err) {
+        if (err && (err.status === 401 || err.status === 403)) { stop(); indicator('stopped'); return; }
+        failures += 1;
+        delay = Math.min(o.maxInterval, o.interval * Math.pow(2, failures));
+        indicator('error', delay);
+      } finally {
+        inFlight = false;
+      }
+      schedule(delay);
+    }
+    function onVisibility() { if (document.visibilityState === 'visible') tick(); else clearTimeout(timer); }
+    function stop() { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); }
+    document.addEventListener('visibilitychange', onVisibility);
+    schedule(o.interval);
+    return {
+      stop,
+      refresh: () => tick(true),
+      mark(data) { last = fingerprint(data); indicator('ok'); },
+    };
   }
 
   // ---------------------------------------------------------------- toasts
@@ -455,6 +536,7 @@
     esc, safeUrl, $, $$, param, money, rupees, toPaise, percent, number, date, dateTime, relative, initials,
     label, ENUMS, options, tone, badge, toast, toastError, flash, consumeFlash, loader, empty, emptyHtml, error, errorHtml,
     busy, table, pagination, formValues, checkedValues, clearErrors, formAlert, showErrors, validate, modal, confirm,
-    prompt, openReceipt,
+    prompt, openReceipt, paymentBadge, poll,
   };
+  RL.poll = poll;
 })(window, document);
