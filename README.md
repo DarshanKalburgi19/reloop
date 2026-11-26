@@ -73,6 +73,13 @@ curl http://localhost:8082/actuator/health
 curl http://localhost:8083/actuator/health
 ```
 
+Or start everything at once (the three services plus the frontend proxy on http://localhost:8080) and wait until
+the demo accounts are ready:
+
+```bash
+scripts/e2e/start-stack.sh          # --build rebuilds the jars, --fresh starts with clean databases, --stop stops
+```
+
 ## Build and test everything
 
 ```bash
@@ -81,7 +88,15 @@ mvn -B -ntp -f order-service/pom.xml verify
 mvn -B -ntp -f repair-service/pom.xml verify
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every push.
+End-to-end scenarios across all services (marketplace sale, repair, failed payment, refund). They run against the
+running stack, or against the mock (`cd frontend && npm run start:mock`):
+
+```bash
+scripts/e2e/run-all.sh              # BASE_URL defaults to http://localhost:8080
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the three builds, the frontend checks, the e2e scenarios against
+the mock, and the e2e scenarios against the real services on every push ([INTEGRATION](docs/INTEGRATION.md)).
 
 ## Project status
 
@@ -133,6 +148,12 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three builds on every 
   earnings, payments and profile. `npm run start:mock` runs it against an in-memory mock for UI work without Java
   ([FRONTEND](docs/FRONTEND.md)).
 
+- **Service integration (complete):** inter-service API audit and fixes. Refunds now reach product-service
+  (passport `SALE_REFUNDED`) and repair-service (repair `REFUNDED` / closed), and failed repair payments are
+  reported to both dashboards. Idempotent refunds, shared contract examples in `contracts/` are checked by a
+  contract test in every service, dashboards refresh themselves by polling, and four end-to-end scenarios run
+  in CI against the real stack ([INTEGRATION](docs/INTEGRATION.md)).
+
 Next: reviews → testing & deployment.
 
 ## Documentation
@@ -148,6 +169,7 @@ Next: reviews → testing & deployment.
 - [docs/PAYMENTS.md](docs/PAYMENTS.md) — orders, fees and commission, simulated payments, refunds and ledger, receipts, dashboards, API, curl walkthrough, tests
 - [docs/DELIVERY_TRACKING.md](docs/DELIVERY_TRACKING.md) — simulated delivery tracking: three legs, statuses, demo locations, ETA, history, access rules, API, Leaflet/OSM frontend integration, curl walkthrough, tests
 - [docs/FRONTEND.md](docs/FRONTEND.md) — web frontend: how to run it (real services or mock), page map, profile-completion prompt, modules, fee display, security notes
+- [docs/INTEGRATION.md](docs/INTEGRATION.md) — how the services integrate: mismatch audit and fixes, contract table (`contracts/`), ID map, idempotency, error handling, dashboard polling, run instructions, end-to-end scenarios
 - [docs/PHASE1.md](docs/PHASE1.md) — Phase 1 runbook, endpoints, test instructions
 
 ## Business rules (implemented; see docs/PAYMENTS.md)

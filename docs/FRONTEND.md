@@ -130,6 +130,22 @@ resource gets 404.
   round HALF_UP like the server. Rates are never hard-coded.
 - If the recorded numbers do not add up, the component shows a warning instead of hiding it.
 
+### Live refresh and cross-service status
+
+Dashboards refresh themselves with `RL.poll(fetcher, apply, {interval})` (`core/ui.js`). Repair detail pages
+refresh every 8 s, lists every 10 s, and overviews and earnings every 15 s. Polling runs only while the tab is
+visible and redraws only when the data changed. It pauses while a dialog or form field is in use, backs off on
+errors and shows "Live · updated …" under the page title. Payment state from order-service appears on both
+sides:
+
+* `RL.orders.statusHtml(order, role)` shows failed attempts ("nothing charged" / "no payout") and refunds;
+* `RL.ui.paymentBadge(paymentStatus)` and the repair page's Payment card show the transaction id, a failed or
+  cancelled attempt, and refunds;
+* the repairer can refund from the repair page (Payment card → Refund). The refund dialog sends one
+  `Idempotency-Key` per dialog.
+
+See [INTEGRATION.md](INTEGRATION.md) §7.
+
 ### Simulated features
 
 - **Payments:** only a method label and a demo outcome (success, declined, cancelled) are sent. No card, UPI or bank
