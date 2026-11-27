@@ -4,7 +4,7 @@
 
 ReLoop is a circular commerce platform for buying and selling pre-owned products and connecting customers with local repair services. It is a student project: three Spring Boot services and a static web frontend, all running locally with file-based H2 databases.
 
-> **Demo scope.** Payments and delivery tracking are **simulated**. No money moves, no payment gateway is contacted, and no GPS device or courier service is involved. Everything runs locally and nothing is deployed.
+> **Demo scope.** Payments and delivery tracking are **simulated**. No money moves, no payment gateway is contacted, and no GPS device or courier service is involved.
 
 ## Table of contents
 
