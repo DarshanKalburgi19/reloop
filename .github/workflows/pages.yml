@@ -1,0 +1,61 @@
+name: GitHub Pages demo
+
+# Publishes a static demo of the frontend (frontend/public + an in-browser mock API) to GitHub Pages.
+# Requires Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# See frontend/pages-demo/README.md.
+
+on:
+  push:
+    # The branch GitHub Pages deploys from (the github-pages environment only allows this branch).
+    branches: [ 'arena/45de6a09-reloop' ]
+    paths:
+      - 'frontend/**'
+      - 'product-service/src/main/resources/static/demo-images/**'
+      - 'repair-service/src/main/resources/static/demo-images/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build static demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build the site (base path /<repository name>)
+        run: node frontend/pages-demo/build.js --out _site --base "/${{ github.event.repository.name }}"
+
+      - name: Check generated JavaScript
+        run: find _site -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
