@@ -4,33 +4,61 @@
 
 ReLoop is a circular commerce platform for buying and selling pre-owned products and connecting customers with local repair services. It is a student project: three Spring Boot services and a static web frontend, all running locally with file-based H2 databases.
 
-> **Demo scope.** Payments and delivery tracking are **simulated**. No money moves, no payment gateway is contacted, and no GPS device or courier service is involved.
+**Live demo:** <https://darshankalburgi19.github.io/reloop/> (frontend only, running on demo data in your browser; see [Live demo](#live-demo)).
+
+> **Demo scope.** Payments and delivery tracking are **simulated**. No money moves, no payment gateway is contacted, and no GPS device or courier service is involved. The online demo runs without the Java services: an in-browser mock answers all API calls.
 
 ## Table of contents
 
-1. [About](#about)
-2. [Problem statement](#problem-statement)
-3. [Solution](#solution)
-4. [Key features](#key-features)
-5. [User roles and permissions](#user-roles-and-permissions)
-6. [How the marketplace works](#how-the-marketplace-works)
-7. [How the repair process works](#how-the-repair-process-works)
-8. [Payment and commission model](#payment-and-commission-model)
-9. [Tech stack](#tech-stack)
-10. [Architecture](#architecture)
-11. [Folder structure](#folder-structure)
-12. [Database design](#database-design)
-13. [Installation and setup (Windows)](#installation-and-setup-windows)
-14. [How to run](#how-to-run)
-15. [API documentation](#api-documentation)
-16. [Testing](#testing)
-17. [Screenshots](#screenshots)
-18. [Future scope and roadmap](#future-scope-and-roadmap)
-19. [Security considerations](#security-considerations)
-20. [Team and contribution](#team-and-contribution)
-21. [Further documentation](#further-documentation)
+1. [Live demo](#live-demo)
+2. [About](#about)
+3. [Problem statement](#problem-statement)
+4. [Solution](#solution)
+5. [Key features](#key-features)
+6. [User roles and permissions](#user-roles-and-permissions)
+7. [How the marketplace works](#how-the-marketplace-works)
+8. [How the repair process works](#how-the-repair-process-works)
+9. [Payment and commission model](#payment-and-commission-model)
+10. [Tech stack](#tech-stack)
+11. [Architecture](#architecture)
+12. [Folder structure](#folder-structure)
+13. [Database design](#database-design)
+14. [Installation and setup (Windows)](#installation-and-setup-windows)
+15. [How to run](#how-to-run)
+16. [API documentation](#api-documentation)
+17. [Testing](#testing)
+18. [Screenshots](#screenshots)
+19. [Future scope and roadmap](#future-scope-and-roadmap)
+20. [Security considerations](#security-considerations)
+21. [Team and contribution](#team-and-contribution)
+22. [Further documentation](#further-documentation)
 
 ---
+
+## Live demo
+
+<https://darshankalburgi19.github.io/reloop/>
+
+The live demo is the ReLoop frontend (the same pages and theme as `frontend/public`) hosted on GitHub Pages. GitHub Pages can only serve static files, so the three Spring Boot services do not run there. Instead, the in-memory mock API from `frontend/dev/mock-api.js` runs inside the browser and answers every `/api/...` call. A **"Mock backend"** banner at the top of each page shows this.
+
+What you can try:
+
+- Browse the marketplace and repair workshops, open product passports and workshop profiles.
+- Register a new account, or sign in with the demo accounts listed in [docs/AUTH.md](docs/AUTH.md) (customer Asha, repairer Ravi).
+- As a customer: list an item, buy a product and pay with a simulated payment (success, decline or cancel), send a repair request, approve a quote and follow a simulated delivery.
+- As a repairer: accept and quote repair requests, manage services, spare-parts inventory and earnings.
+
+Limitations:
+
+| Topic | Live demo behaviour |
+|---|---|
+| Backend | No Java services and no H2 databases; the mock follows the same request and response shapes |
+| Data | Stored in the visitor's own browser (`localStorage`); other visitors do not see it |
+| Accounts | Demo accounts and new registrations exist only in that browser's mock data |
+| Payments and tracking | Simulated, as in the full stack |
+| Reset | Open any page with `?reset-demo` added to the URL to restore the original demo data |
+
+How it is published: the workflow [.github/workflows/pages.yml](.github/workflows/pages.yml) runs [frontend/pages-demo/build.js](frontend/pages-demo/build.js) on every push that changes the frontend, and deploys the result with GitHub Actions (repository setting **Pages → Source: GitHub Actions**). The build copies `frontend/public` into a separate folder, prefixes root paths with `/reloop`, copies the demo images and adds the browser mock. The source files are not modified. Details: [frontend/pages-demo/README.md](frontend/pages-demo/README.md).
 
 ## About
 
@@ -85,9 +113,10 @@ Status labels:
 | Tracking | Delivery legs (store to customer, customer to repairer, repairer to customer) moved along predefined Gujarat demo points by an "advance" call | Implemented (simulated) |
 | Dashboards | Customer and repairer dashboards (listings, sales, purchases, repairs, jobs, earnings, payments, inventory) with periodic polling | Implemented |
 | Frontend | Mock backend (`node server.js --mock`) for UI work without Java | Implemented |
+| Frontend | Static live demo on GitHub Pages with the mock API running in the browser | Implemented |
 | Platform | Admin role, admin console or moderation | Planned (no admin role exists) |
 | Platform | Email, SMS or push notifications | Planned |
-| Platform | Real payment gateway, real GPS or courier tracking, deployment | Planned |
+| Platform | Real payment gateway, real GPS or courier tracking, deployment of the backend services | Planned |
 
 ## User roles and permissions
 
@@ -212,6 +241,7 @@ Fee rates can be read with `GET /api/fee-rates` and changed through internal end
 | Frontend server | `frontend/server.js`: a dependency-free Node.js server (Node 18+) that serves pages and proxies `/api` |
 | Testing | JUnit 5 and Spring Boot Test (spring-boot-starter-test), spring-security-test (product-service), Node static checks, Bash/curl/jq end-to-end scripts |
 | CI | GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) |
+| Hosting (demo) | GitHub Pages, deployed by GitHub Actions ([.github/workflows/pages.yml](.github/workflows/pages.yml)); frontend and browser mock only |
 
 ## Architecture
 
@@ -239,11 +269,24 @@ flowchart LR
 
 More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/INTEGRATION.md](docs/INTEGRATION.md), and the cross-service contract samples in [contracts/](contracts/).
 
+### Live demo architecture
+
+The GitHub Pages demo replaces the Node server and the three services with static files and a mock that runs in the browser:
+
+```mermaid
+flowchart LR
+    GH["GitHub Pages<br/>static files built from frontend/public"] -->|"HTML, CSS, JS, demo images"| UI["Page scripts in the browser"]
+    UI -->|"fetch /api/..."| M["In-browser mock API<br/>assets/js/pages-demo/mock.js"]
+    M --- LS[("localStorage<br/>demo data")]
+```
+
 ## Folder structure
 
 ```text
 reloop/
-├── .github/workflows/ci.yml     # CI: Maven verify per service, frontend checks, end-to-end run
+├── .github/workflows/
+│   ├── ci.yml                   # CI: Maven verify per service, frontend checks, end-to-end run
+│   └── pages.yml                # Builds and deploys the GitHub Pages live demo
 ├── contracts/                   # JSON samples for each service-to-service call
 │   ├── order-to-product/
 │   ├── order-to-repair/
@@ -254,6 +297,7 @@ reloop/
 │   ├── server.js                # Static server + /api proxy (--mock for the in-memory API)
 │   ├── dev/mock-api.js          # Mock backend used by --mock
 │   ├── scripts/check.js         # Static checks run by `npm test`
+│   ├── pages-demo/              # Live demo build: build.js, browser-mock.js, README.md
 │   └── public/                  # HTML pages, customer/ and repairer/ dashboards, assets/{css,img,js}
 ├── product-service/             # Spring Boot, port 8081, package com.reloop.product
 ├── order-service/               # Spring Boot, port 8082, package com.reloop.orderpayment
@@ -414,6 +458,17 @@ node server.js --mock
 
 All `/api` calls are answered from the in-memory mock in `frontend/dev/mock-api.js`, and the UI shows a mock banner.
 
+### Live demo build (GitHub Pages)
+
+To build the same static site that is published to GitHub Pages:
+
+```powershell
+node frontend/pages-demo/build.js --out C:\temp\pages\reloop --base /reloop
+python -m http.server 8000 -d C:\temp\pages
+```
+
+Then open <http://localhost:8000/reloop/>. The second command needs Python; any static file server works. Keep the output folder outside the repository so generated files are not committed.
+
 ### H2 console
 
 Each service exposes `/h2-console` for local inspection, for example <http://localhost:8081/h2-console> with JDBC URL `jdbc:h2:file:./data/reloop_product`. The credentials are in that service's `application.properties`.
@@ -567,7 +622,7 @@ From the last CI run on this branch (commit `c44cb75`):
 | Frontend checks | 125 checks passed (42 JS files, 32 HTML pages) |
 | End-to-end, mock backend and real services | 4 scenarios passed |
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `mvn verify` for each service, the frontend checks with a mock-backend smoke test, and the four scenarios against the real three-service stack. Code-coverage percentages are not measured (no coverage tool is configured).
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `mvn verify` for each service, the frontend checks with a mock-backend smoke test, and the four scenarios against the real three-service stack. A separate workflow ([.github/workflows/pages.yml](.github/workflows/pages.yml)) builds the live demo, checks the generated JavaScript and deploys it to GitHub Pages. Code-coverage percentages are not measured (no coverage tool is configured).
 
 ## Screenshots
 
@@ -576,7 +631,7 @@ No screenshots are committed to the repository. The only image assets are the fa
 - `product-service/src/main/resources/static/demo-images/placeholders/`
 - `repair-service/src/main/resources/static/demo-images/repairs/`
 
-To see the UI, run `node server.js --mock` in `frontend/` and open <http://localhost:8080>.
+To see the UI, open the [live demo](https://darshankalburgi19.github.io/reloop/) or run `node server.js --mock` in `frontend/` and open <http://localhost:8080>.
 
 ## Future scope and roadmap
 
@@ -589,7 +644,7 @@ These items are **not implemented**:
 - Store management for sellers (create and edit stores).
 - Image upload and storage (listings currently use URLs).
 - Email, SMS or push notifications (dashboards currently poll for updates).
-- A production database (for example PostgreSQL), containerisation and deployment. There is no Dockerfile or deployment configuration.
+- A production database (for example PostgreSQL), containerisation and deployment of the backend services. Only the frontend demo is deployed (GitHub Pages); there is no Dockerfile or server deployment configuration.
 - A Maven wrapper (`mvnw`) for easier setup.
 
 ## Security considerations
@@ -630,6 +685,7 @@ No license file is included in the repository, so no open-source license has bee
 | [docs/INVENTORY.md](docs/INVENTORY.md) | Spare-parts inventory |
 | [docs/DELIVERY_TRACKING.md](docs/DELIVERY_TRACKING.md) | Simulated delivery tracking |
 | [docs/FRONTEND.md](docs/FRONTEND.md) | Frontend pages, dev server, mock API |
+| [frontend/pages-demo/README.md](frontend/pages-demo/README.md) | GitHub Pages live demo: build, deployment, reset |
 | [docs/INTEGRATION.md](docs/INTEGRATION.md) | Service integration and end-to-end scenarios |
 | [docs/ER_DIAGRAM.md](docs/ER_DIAGRAM.md), [docs/SCHEMA.md](docs/SCHEMA.md) | Data model |
 | [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md) | Repository audit of code and REST contracts (written at an earlier commit) |
